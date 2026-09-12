@@ -130,16 +130,15 @@ DASHBOARD_CACHE_MINUTES=15
 
 ---
 
-## 5. Instrucciones de deploy (Coolify / VPS)
+## 5. Deploy (Coolify / VPS) — ✅ LIVE
 
-1. `git init && git add . && git commit -m "rafael-intelligence cockpit"` y push a un repo.
-2. En Coolify → **New Resource → Application** desde el repo (buildpack **Nixpacks**, detecta Next.js solo).
-3. Variables de entorno de la app: `AIRTABLE_TOKEN`, `AIRTABLE_BASE_HISTORICA`,
-   `AIRTABLE_BASE_AGENTICA`, `DASHBOARD_CACHE_MINUTES=15`.
-4. Puerto: **3000** (Nixpacks: `npm run build` / `npm start` automáticos).
-5. Dominio sugerido: `rafael-intelligence.sistemasagenticos.cloud` + TLS.
-6. Verificar post-deploy: `GET /api/dashboard` (200) y la home renderiza KPIs.
-7. Recordatorio: NO exponer el token al cliente; todas las llamadas Airtable pasan por el server.
+**Producción**: https://dashbord-raseguros.sistemasagenticos.cloud
+
+- App Coolify: `dashbord-raseguros` (uuid `g4k8i3s4i2t3diogh6rrdm6g`, proyecto `crm_seguros-agenticos`, server `f13bg8daiv2bfavilj8taz16`, destino `f851shw3iv9p51fbm952gg1p`).
+- Repo: `github.com/grupoprosperyn8n/rafael-intelligence` (público, rama `main`). Build pack **Dockerfile** (multi-stage `node:22-alpine` + `output: standalone`).
+- Env vars (Coolify, runtime): `AIRTABLE_TOKEN`, `AIRTABLE_BASE_HISTORICA`, `AIRTABLE_BASE_AGENTICA`, `DASHBOARD_CACHE_MINUTES=15`. El token NUNCA llega al cliente (server-side solamente, sin prefijo `NEXT_PUBLIC_`).
+- Redeploy: `git push` + encolar deploy (`queue_application_deployment` vía PHP en el contenedor `coolify`) — esta instancia no auto-despliega por webhook.
+- Verificación post-deploy: home 200 con TLS (Let's Encrypt); `GET /api/dashboard` → 200 (primera carga ~2 min, luego caché); 0 apariciones del token en HTML/bundles.
 
 ---
 
