@@ -1621,7 +1621,12 @@ export default function ExecutiveDashboard() {
                       data.crm.kpis.conversations
                     )} conversaciones · ${number(
                       data.crm.kpis.openConversations
-                    )} abiertas`}
+                    )} ${
+                      data.crm.kpis
+                        .openConversations === 1
+                        ? "abierta"
+                        : "abiertas"
+                    }`}
                     icon={<Users />}
                   />
 
@@ -1866,7 +1871,10 @@ export default function ExecutiveDashboard() {
                         {number(
                           data.crm.kpis.closedConversations
                         )}{" "}
-                        conversaciones cerradas
+                        {data.crm.kpis
+                          .closedConversations === 1
+                          ? "conversación cerrada"
+                          : "conversaciones cerradas"}
                       </span>
                     </div>
                   </Section>
