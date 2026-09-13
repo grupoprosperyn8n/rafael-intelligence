@@ -86,7 +86,7 @@ rafael-intelligence/
 3. **Retención** — vencimientos ≤7/≤30 días, clientes a observar, siniestros (base del futuro score).
 4. **Reactivación** — candidatos detectados y universo potencial de históricos sin póliza activa cargada.
 5. **Venta cruzada** — clientes con 1 póliza y oportunidades por producto (Auto→Auxilio/Hogar/Vida, Moto→AP/Vida…).
-6. **Cliente 360°** — búsqueda por nombre/DNI/teléfono, score y próxima mejor acción.
+6. **Cliente 360°** — búsqueda por nombre/DNI/teléfono, score, próxima mejor acción explicada (por qué + pasos) y link a la ficha en el backoffice.
 7. **Calidad y avance de migración** — tasas de match y campos faltantes de la migración.
 8. **CRM · Venta y gestión** (3ª fuente) — pipeline comercial del CRM Vocero (etapas y montos),
    actividad de conversaciones y mensajes (incluye respuestas de IA), y **macheo CRM ↔ cartera**:
