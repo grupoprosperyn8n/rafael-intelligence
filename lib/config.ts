@@ -94,5 +94,17 @@ export const CONFIG = {
     clientsPage:
       process.env.AIRTABLE_BACKOFFICE_CLIENTS_PAGE ||
       "pagloDiKehe3EMnT4",
+
+    /*
+     * Paginas de la interfaz nativa para polizas y gestiones:
+     * las usan los links "Ver poliza" de las listas dinamicas.
+     */
+    policiesPage:
+      process.env.AIRTABLE_BACKOFFICE_POLICIES_PAGE ||
+      "paguNCUHZRnPblGti",
+
+    managementPage:
+      process.env.AIRTABLE_BACKOFFICE_MANAGEMENT_PAGE ||
+      "pag3HZa7GNLZI8ijC",
   },
 };

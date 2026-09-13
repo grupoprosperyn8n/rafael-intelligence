@@ -186,6 +186,39 @@ export type DashboardResponse = {
   }[];
 
   crm: CrmAnalytics;
+
+  /*
+   * Listas dinamicas: el "por dentro" de cada numero del tablero.
+   * Cada lista trae los registros reales (clientes / polizas /
+   * gestiones) detras de una metrica, con su link a la ficha en el
+   * backoffice. Clave = modulo del tablero.
+   */
+  lists: Record<string, DrillList[]>;
+};
+
+/*
+ * LISTAS DINAMICAS
+ */
+
+export type DrillLink = {
+  label: string;
+  url: string;
+};
+
+export type DrillItem = {
+  name: string;
+  dni?: string;
+  detail?: string;
+  extra?: string;
+  links: DrillLink[];
+};
+
+export type DrillList = {
+  id: string;
+  title: string;
+  total: number;
+  shown: number;
+  items: DrillItem[];
 };
 
 /*

@@ -48,7 +48,12 @@ import {
   UserRoundCheck,
   Users,
   X,
+  ListTree,
 } from "lucide-react";
+
+import type {
+  DrillList,
+} from "@/lib/types";
 
 import { MODULE_AI_IDS } from "@/lib/types";
 
@@ -105,16 +110,27 @@ function Kpi({
   subtitle,
   icon,
   tone = "default",
+  onClick,
 }: {
   title: string;
   value: string;
   subtitle: string;
   icon: React.ReactNode;
   tone?: string;
+  onClick?: () => void;
 }) {
   return (
     <article
-      className={`kpi-card ${tone}`}
+      className={`kpi-card ${tone}${
+        onClick ? " clickable" : ""
+      }`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      title={
+        onClick
+          ? "Ver la lista de clientes detrás de este número"
+          : undefined
+      }
     >
       <div className="kpi-top">
         <span className="kpi-title">
@@ -133,6 +149,12 @@ function Kpi({
       <span className="kpi-subtitle">
         {subtitle}
       </span>
+
+      {onClick && (
+        <span className="kpi-more">
+          Ver lista →
+        </span>
+      )}
     </article>
   );
 }
@@ -478,6 +500,188 @@ function SuggestionsStrip({
         ))}
       </div>
     </section>
+  );
+}
+
+/*
+ * Listas dinamicas: el "por dentro" de cada numero del modulo.
+ * Muestra los registros reales detras de cada metrica (clientes,
+ * polizas, gestiones) con su link a la ficha en el backoffice,
+ * y permite filtrarlos al vuelo.
+ */
+function ModuleLists({
+  module,
+  lists,
+  open,
+  active,
+  onToggle,
+  onSelect,
+}: {
+  module: string;
+  lists: DrillList[];
+  open: boolean;
+  active: string;
+  onToggle: () => void;
+  onSelect: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+
+  const current =
+    lists.find((list) => list.id === active) ||
+    lists[0];
+
+  if (lists.length === 0 || !current) {
+    return null;
+  }
+
+  const normalized = query.trim().toLowerCase();
+
+  const visible = normalized
+    ? current.items.filter((item) =>
+        [
+          item.name,
+          item.dni,
+          item.detail,
+          item.extra,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalized)
+      )
+    : current.items;
+
+  const totalRecords = lists.reduce(
+    (sum, list) => sum + list.total,
+    0
+  );
+
+  return (
+    <div
+      className="mod-lists"
+      id={`lists-${module}`}
+    >
+      <button
+        type="button"
+        className="mod-lists-toggle"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <ListTree size={15} />
+
+        <span className="mod-lists-label">
+          Listas del módulo
+        </span>
+
+        <span className="mod-lists-count">
+          {number(totalRecords)} registros
+        </span>
+
+        <ChevronDown
+          size={15}
+          className={
+            open
+              ? "mod-lists-chevron open"
+              : "mod-lists-chevron"
+          }
+        />
+      </button>
+
+      {open && (
+        <div className="mod-lists-body">
+          <div className="mod-lists-tabs">
+            {lists.map((list) => (
+              <button
+                key={list.id}
+                type="button"
+                className={`mod-list-tab${
+                  list.id === current.id
+                    ? " active"
+                    : ""
+                }`}
+                onClick={() => onSelect(list.id)}
+              >
+                {list.title}
+
+                <b>{number(list.total)}</b>
+              </button>
+            ))}
+          </div>
+
+          <div className="mod-lists-tools">
+            <input
+              value={query}
+              onChange={(event) =>
+                setQuery(event.target.value)
+              }
+              placeholder="Filtrar (nombre, DNI, póliza…)"
+            />
+
+            <span className="mod-lists-print">
+              {normalized
+                ? `${visible.length} de ${current.items.length}`
+                : `${current.shown} de ${number(
+                    current.total
+                  )}`}
+
+              {!normalized &&
+              current.total > current.shown
+                ? " · primeros registros"
+                : ""}
+            </span>
+          </div>
+
+          <div className="mod-lists-table">
+            {visible.map((item, index) => (
+              <div
+                className="mod-list-row"
+                key={`${item.name}-${index}`}
+              >
+                <div className="mod-list-main">
+                  <strong>{item.name}</strong>
+
+                  {item.dni && (
+                    <span className="mod-list-dni">
+                      DNI {item.dni}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mod-list-detail">
+                  <span>{item.detail}</span>
+
+                  <span className="mod-list-extra">
+                    {item.extra}
+                  </span>
+                </div>
+
+                <div className="mod-list-links">
+                  {item.links.map((link) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mod-list-link"
+                    >
+                      {link.label}
+
+                      <ArrowUpRight size={12} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {visible.length === 0 && (
+              <div className="mod-list-empty">
+                Sin resultados para el filtro.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1188,6 +1392,82 @@ export default function ExecutiveDashboard() {
     );
   };
 
+  /*
+   * Listas dinamicas por modulo: estado de abierto/activo y
+   * helpers para abrirlas desde las tarjetas de KPI.
+   */
+
+  const [listOpen, setListOpen] = useState<
+    Record<string, boolean>
+  >({});
+
+  const [listSel, setListSel] = useState<
+    Record<string, string>
+  >({});
+
+  const openList = (
+    module: string,
+    listId: string
+  ) => {
+    setListSel((prev) => ({
+      ...prev,
+      [module]: listId,
+    }));
+
+    setListOpen((prev) => ({
+      ...prev,
+      [module]: true,
+    }));
+
+    setTimeout(() => {
+      document
+        .getElementById(`lists-${module}`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 80);
+  };
+
+  const listsRow = (module: string) => {
+    const moduleLists =
+      (data && data.lists && data.lists[module]) ||
+      [];
+
+    if (moduleLists.length === 0) {
+      return null;
+    }
+
+    return (
+      <ModuleLists
+        key={module}
+        module={module}
+        lists={moduleLists}
+        open={Boolean(listOpen[module])}
+        active={
+          listSel[module] || moduleLists[0].id
+        }
+        onToggle={() =>
+          setListOpen((prev) => ({
+            ...prev,
+            [module]: !prev[module],
+          }))
+        }
+        onSelect={(id) => {
+          setListSel((prev) => ({
+            ...prev,
+            [module]: id,
+          }));
+
+          setListOpen((prev) => ({
+            ...prev,
+            [module]: true,
+          }));
+        }}
+      />
+    );
+  };
+
   async function load(
     override?: typeof filters
   ) {
@@ -1778,6 +2058,8 @@ export default function ExecutiveDashboard() {
             />
 
             {aiRow("pulso")}
+
+            {listsRow("pulso")}
             <section className="kpi-grid">
               <Kpi
                 title="Clientes históricos"
@@ -2070,6 +2352,8 @@ export default function ExecutiveDashboard() {
             />
 
             {aiRow("cartera")}
+
+            {listsRow("cartera")}
             <div className="notice warning-notice">
               <AlertTriangle
                 size={20}
@@ -2296,9 +2580,17 @@ export default function ExecutiveDashboard() {
             />
 
             {aiRow("retencion")}
+
+            {listsRow("retencion")}
             <section className="kpi-grid">
               <Kpi
                 title="Vencen ≤7 días"
+                onClick={() =>
+                  openList(
+                    "retencion",
+                    "expires7"
+                  )
+                }
                 value={number(
                   data.current.expires7
                 )}
@@ -2309,6 +2601,12 @@ export default function ExecutiveDashboard() {
 
               <Kpi
                 title="Vencen ≤30 días"
+                onClick={() =>
+                  openList(
+                    "retencion",
+                    "expires30"
+                  )
+                }
                 value={number(
                   data.current.expires30
                 )}
@@ -2319,6 +2617,12 @@ export default function ExecutiveDashboard() {
 
               <Kpi
                 title="Clientes a observar"
+                onClick={() =>
+                  openList(
+                    "retencion",
+                    "watch"
+                  )
+                }
                 value={number(
                   data.opportunity
                     .retentionWatch
@@ -2377,9 +2681,17 @@ export default function ExecutiveDashboard() {
             />
 
             {aiRow("reactivacion")}
+
+            {listsRow("reactivacion")}
             <section className="kpi-grid">
               <Kpi
                 title="Candidatos detectados"
+                onClick={() =>
+                  openList(
+                    "reactivacion",
+                    "candidates"
+                  )
+                }
                 value={number(
                   data.opportunity
                     .reactivationCandidates
@@ -2475,6 +2787,8 @@ export default function ExecutiveDashboard() {
             />
 
             {aiRow("cross")}
+
+            {listsRow("cross")}
             <section className="kpi-grid">
               <Kpi
                 title="Una sola póliza"
@@ -2920,6 +3234,8 @@ export default function ExecutiveDashboard() {
             />
 
             {aiRow("migracion")}
+
+            {listsRow("migracion")}
             <section className="kpi-grid">
               <Kpi
                 title="Clientes"
@@ -3070,6 +3386,8 @@ export default function ExecutiveDashboard() {
 
             {data.crm?.available &&
               aiRow("crm")}
+
+            {listsRow("crm")}
             {!data.crm.available ? (
               <Section
                 title="CRM · Venta y gestión"
