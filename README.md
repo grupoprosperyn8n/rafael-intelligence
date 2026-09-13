@@ -48,12 +48,13 @@ rafael-intelligence/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
-│   └── ExecutiveDashboard.tsx   (8 módulos, filtros, búsqueda)
+│   └── ExecutiveDashboard.tsx   (8 módulos, guía por módulo, sugerencias, filtros)
 ├── lib/
 │   ├── airtable.ts              (paginación completa + caché 15 min)
 │   ├── analytics.ts             (el corazón: cruce + BI)
 │   ├── config.ts                (bases, tablas y campos Airtable)
 │   ├── crm.ts                   (3ª fuente: snapshot del CRM + macheo en memoria)
+│   ├── help.ts                  (guías interactivas: qué es / qué mide / para qué sirve)
 │   ├── normalize.ts             (DNI, teléfono, email, nombre)
 │   └── types.ts
 ├── docs/
@@ -91,7 +92,7 @@ rafael-intelligence/
    actividad de conversaciones y mensajes (incluye respuestas de IA), y **macheo CRM ↔ cartera**:
    contactos cruzados contra clientes/pólizas/gestiones, prima activa vinculada y vencimientos ≤ 30 días.
 
-Filtros globales: rango de fechas, oficina, producto, canal, compañía.
+Filtros globales: rango de fechas (con presets **Este mes / Mes pasado / Este año / Todo el tiempo**), oficina, producto, empleado, canal y compañía + chips de filtros activos (quitar individual) y **Limpiar todo**. Cada módulo incluye su **zona de ayuda** interactiva (¿Qué es? / ¿Qué mide? / ¿Para qué te sirve? + sugerencias accionables) y el tablero abre con la franja **Sugerencias de hoy** (chips con datos reales que llevan al módulo correspondiente).
 
 ---
 
