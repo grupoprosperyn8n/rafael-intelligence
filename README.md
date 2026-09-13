@@ -56,6 +56,8 @@ rafael-intelligence/
 │   ├── crm.ts                   (3ª fuente: snapshot del CRM + macheo en memoria)
 │   ├── normalize.ts             (DNI, teléfono, email, nombre)
 │   └── types.ts
+├── docs/
+│   └── manual-usuario.html      (manual de usuario final; PDF con Chrome headless)
 ├── scripts/
 │   └── sync-crm.mjs             (snapshot SOLO LECTURA del CRM → data/crm-snapshot.json)
 ├── .env.example

@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cockpit Rafael Allende — Manual de usuario</title>
+<style>
+  @page { size: A4; margin: 0; }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :root {
+    --accent: #0d5bff;
+    --accent-ink: #0a4de6;
+    --cyan: #00c6f5;
+    --ink: #0a1730;
+    --muted: #42506b;
+    --soft: #8391aa;
+    --bg: #f6f8fc;
+    --panel: #eef2f9;
+    --line: #e8edf6;
+    --ok: #1fb35b;
+    --ok-soft: #e9f7ee;
+    --warn: #f2a71b;
+    --warn-soft: #fef6e6;
+    --danger: #d94a4a;
+    --danger-soft: #fdf0f0;
+  }
+
+  html, body {
+    background: #e8ebf2;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff;
+    padding: 16mm 15mm 16mm;
+    position: relative;
+    page-break-after: always;
+    margin: 0 auto;
+  }
+
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  .pfoot {
+    position: absolute;
+    left: 15mm;
+    right: 15mm;
+    bottom: 8mm;
+    display: flex;
+    justify-content: space-between;
+    font-family: "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+    font-size: 8.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--soft);
+    border-top: 1px solid var(--line);
+    padding-top: 4mm;
+  }
+
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+
+  .bar {
+    width: 64px;
+    height: 4px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    margin: 10px 0 18px;
+  }
+
+  h1 {
+    font-size: 40px;
+    line-height: 1.04;
+    letter-spacing: -.02em;
+    font-weight: 800;
+  }
+
+  h1 .thin {
+    color: var(--accent);
+  }
+
+  .sub {
+    margin-top: 14px;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 150mm;
+  }
+
+  h2 {
+    font-size: 19px;
+    letter-spacing: -.01em;
+    margin-bottom: 4px;
+  }
+
+  .lead {
+    font-size: 11.8px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    max-width: 170mm;
+  }
+
+  .chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 22px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 13px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--bg);
+  }
+
+  .chip.on {
+    background: var(--ok-soft);
+    color: #157a41;
+    border-color: #c9ebd6;
+  }
+
+  .urlbox {
+    margin-top: 26px;
+    border: 1.5px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px 18px;
+    background: #f4f8ff;
+  }
+
+  .urlbox .kicker {
+    color: var(--accent-ink);
+  }
+
+  .url {
+    font-family: "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent-ink);
+    margin-top: 6px;
+    word-break: break-all;
+  }
+
+  .cards2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: #fff;
+  }
+
+  .card h3 {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+
+  .card p {
+    color: var(--muted);
+    font-size: 11.4px;
+  }
+
+  .todo {
+    display: grid;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .todo div {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 11.8px;
+  }
+
+  .todo b {
+    min-width: 118px;
+    color: var(--accent-ink);
+  }
+
+  .mod {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px 15px 13px;
+    margin-bottom: 9px;
+    background: #fff;
+  }
+
+  .mod-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .mod-num {
+    min-width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: var(--panel);
+    color: var(--accent-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 12px;
+  }
+
+  .mod h3 {
+    font-size: 14.5px;
+    letter-spacing: .005em;
+  }
+
+  .mod .tag {
+    font-family: "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+    font-size: 8.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--soft);
+    margin-left: auto;
+  }
+
+  .mod p {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .mod .use {
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--ink);
+  }
+
+  .mod .use b {
+    color: var(--accent-ink);
+  }
+
+  .diagram {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0 6px;
+  }
+
+  .dbox {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 11px 13px;
+    background: var(--bg);
+    text-align: center;
+  }
+
+  .dbox b {
+    display: block;
+    font-size: 12.5px;
+  }
+
+  .dbox span {
+    font-size: 10.5px;
+    color: var(--soft);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  .darrow {
+    text-align: center;
+    color: var(--accent);
+    font-size: 16px;
+    margin: 2px 0;
+  }
+
+  .dresult {
+    border: 1.5px solid var(--accent);
+    border-radius: 12px;
+    padding: 11px 13px;
+    text-align: center;
+    background: #f4f8ff;
+    font-weight: 800;
+    color: var(--accent-ink);
+    font-size: 12.5px;
+  }
+
+  .note {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--warn);
+    border-radius: 10px;
+    padding: 10px 13px;
+    background: var(--warn-soft);
+    font-size: 11.3px;
+    color: var(--muted);
+    margin-top: 12px;
+  }
+
+  .note b {
+    color: var(--ink);
+  }
+
+  .qa {
+    border-top: 1px solid var(--line);
+    padding: 10px 0 9px;
+  }
+
+  .qa:first-of-type {
+    border-top: none;
+    padding-top: 2px;
+  }
+
+  .qa .q {
+    font-weight: 800;
+    font-size: 12px;
+    margin-bottom: 3px;
+  }
+
+  .qa .a {
+    color: var(--muted);
+    font-size: 11.4px;
+  }
+
+  .gain {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .gain .card {
+    text-align: center;
+  }
+
+  .gain .big {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .sign {
+    margin-top: 26px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+    font-size: 11px;
+    color: var(--soft);
+  }
+
+  .sign b {
+    color: var(--ink);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ PÁGINA 1 · PORTADA ============ -->
+<div class="page" style="padding-top:34mm">
+  <div class="kicker">Manual de usuario · Septiembre 2026</div>
+  <div class="bar"></div>
+
+  <h1>
+    Cockpit Ejecutivo<br>
+    <span class="thin">Inteligencia de Cartera</span>
+  </h1>
+
+  <p class="sub">
+    Todo el negocio en una sola pantalla: la historia comercial, la cartera
+    de pólizas y las conversaciones del CRM — juntos, ordenados y siempre
+    al día. Se abre y te cuenta cómo viene el negocio, sin abrir cinco
+    sistemas.
+  </p>
+
+  <div class="chips">
+    <span class="chip on">✓ Se actualiza solo</span>
+    <span class="chip on">✓ No modifica nada</span>
+    <span class="chip on">✓ Todo en un solo lugar</span>
+  </div>
+
+  <div class="urlbox">
+    <div class="kicker">Entrá desde acá (computadora, tablet o celular)</div>
+    <div class="url">https://dashbord-raseguros.sistemasagenticos.cloud</div>
+  </div>
+
+  <p class="sub" style="margin-top:26px; font-size:12.5px">
+    La primera vez puede tardar hasta 2 minutos mientras arma el análisis
+    completo. Después abre al instante, todos los días, sin hacer nada.
+  </p>
+
+  <div class="pfoot">
+    <span>Rafael Allende · Inteligencia de Cartera</span>
+    <span>GPY · Sistemas Agénticos — pág. 1</span>
+  </div>
+</div>
+
+<!-- ============ PÁGINA 2 · QUÉ ES / PARA QUÉ SIRVE ============ -->
+<div class="page">
+  <div class="kicker">01 · Lo básico</div>
+  <div class="bar"></div>
+
+  <h2>¿Qué es?</h2>
+  <p class="lead">
+    Es un <b>tablero de control</b> que mira por vos tus dos sistemas —la base
+    histórica de Rafael y el sistema nuevo de seguros— más el CRM de WhatsApp,
+    y te los muestra <b>juntos, limpios y claros</b>. No reemplaza a tus
+    sistemas: es la <b>vista de arriba</b>, la que en 10 minutos te dice cómo
+    viene el negocio.
+  </p>
+
+  <h2 style="margin-top:18px">¿Para qué sirve?</h2>
+  <p class="lead">Para decidir, todos los días, sin abrir cinco sistemas:</p>
+
+  <div class="todo">
+    <div><b>Renovar a tiempo →</b><span>te muestra qué pólizas vencen esta semana y este mes, para llamar antes de perderlas.</span></div>
+    <div><b>Recuperar clientes →</b><span>la lista de quiénes alguna vez compraron y hoy no tienen póliza activa.</span></div>
+    <div><b>Vender más →</b><span>a qué cliente ofrecerle qué producto (los que tienen Auto y no tienen Hogar, por ejemplo).</span></div>
+    <div><b>Atender mejor →</b><span>la ficha completa de cada cliente —historia, pólizas y recomendación— antes de llamarlo.</span></div>
+    <div><b>Seguir tus chats →</b><span>qué se está hablando en el CRM, cuánto responde el asistente automático y qué ventas están por cerrar.</span></div>
+  </div>
+
+  <h2 style="margin-top:18px">¿Cómo se usa?</h2>
+  <div class="cards2">
+    <div class="card">
+      <h3>1 · Entrá y mirá</h3>
+      <p>Abrís el link y listo. Arriba tenés filtros (fechas, oficina, producto,
+      canal, compañía) que aplican a todo el tablero. El botón
+      «Actualizar» refresca cuando quieras.</p>
+    </div>
+    <div class="card">
+      <h3>2 · Navegá por solapas</h3>
+      <p>El menú de la izquierda tiene los 8 módulos: desde el pulso general
+      hasta el detalle cliente por cliente. Se navega como cualquier página web.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Para tu tranquilidad:</b> el tablero es de <b>solo lectura</b>. Mira
+    la información, nunca cambia, escribe ni borra nada en tus sistemas.
+  </div>
+
+  <div class="pfoot">
+    <span>Cockpit Rafael Allende · Manual de usuario</span>
+    <span>GPY · Sistemas Agénticos — pág. 2</span>
+  </div>
+</div>
+
+<!-- ============ PÁGINA 3 · MÓDULOS 1-4 ============ -->
+<div class="page">
+  <div class="kicker">02 · Los módulos, uno por uno</div>
+  <div class="bar"></div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">1</div>
+      <h3>Pulso del negocio</h3>
+      <span class="tag">La foto general</span>
+    </div>
+    <p><b>Qué te muestra:</b> cómo viene el negocio mes a mes — clientes nuevos,
+    anulaciones, siniestros y cotizaciones, con el saldo neto (si creciste o
+    perdiste).</p>
+    <p class="use"><b>Para qué te sirve:</b> saber de un vistazo si el año viene
+    bien o hay que acelerar, sin pedirle números a nadie.</p>
+  </div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">2</div>
+      <h3>Cartera</h3>
+      <span class="tag">Lo que tenés vigente</span>
+    </div>
+    <p><b>Qué te muestra:</b> todas las pólizas del sistema nuevo: cuántas hay,
+    cuántas están activas, cuánta plata representan en primas, y cómo se
+    reparten por compañía y por producto.</p>
+    <p class="use"><b>Para qué te sirve:</b> saber exactamente qué cartera estás
+    administrando hoy y dónde está concentrada.</p>
+  </div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">3</div>
+      <h3>Retención</h3>
+      <span class="tag">Lo urgente, primero</span>
+    </div>
+    <p><b>Qué te muestra:</b> las pólizas que vencen en los próximos 7 y 30
+    días, los clientes que conviene mirar de cerca y los siniestros.</p>
+    <p class="use"><b>Para qué te sirve:</b> llamar <b>antes</b> del vencimiento
+    y retener al cliente en lugar de salir a recuperarlo después.</p>
+  </div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">4</div>
+      <h3>Reactivación</h3>
+      <span class="tag">Clientes dormidos</span>
+    </div>
+    <p><b>Qué te muestra:</b> los clientes que alguna vez te compraron pero hoy
+    no tienen póliza activa cargada — hay miles de oportunidades ahí.</p>
+    <p class="use"><b>Para qué te sirve:</b> recuperarlos con una llamada o una
+    promoción; es la venta más fácil, porque ya te conocen.</p>
+  </div>
+
+  <div class="note">
+    <b>Todos los módulos comparten los filtros de arriba:</b> fechas, oficina,
+    producto, canal y compañía. Si filtrás por una oficina, todo el tablero se
+    enfoca en esa oficina.
+  </div>
+
+  <div class="pfoot">
+    <span>Cockpit Rafael Allende · Manual de usuario</span>
+    <span>GPY · Sistemas Agénticos — pág. 3</span>
+  </div>
+</div>
+
+<!-- ============ PÁGINA 4 · MÓDULOS 5-8 ============ -->
+<div class="page">
+  <div class="kicker">02 · Los módulos, uno por uno (continuación)</div>
+  <div class="bar"></div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">5</div>
+      <h3>Venta cruzada</h3>
+      <span class="tag">Venderle más al que ya confía</span>
+    </div>
+    <p><b>Qué te muestra:</b> qué clientes tienen un solo producto y qué más se
+    les puede ofrecer (los de Auto sin Auxilio, sin Hogar, sin Vida, y así por
+    cada rubro), con la lista concreta de cada oportunidad.</p>
+    <p class="use"><b>Para qué te sirve:</b> crecer sobre la cartera que ya
+    tenés, sin salir a buscar clientes nuevos.</p>
+  </div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">6</div>
+      <h3>Cliente 360°</h3>
+      <span class="tag">La ficha completa</span>
+    </div>
+    <p><b>Qué te muestra:</b> un buscador de clientes: escribís un nombre (o
+    DNI o teléfono) y ves TODO junto — su historia de gestiones, sus pólizas,
+    cuánto vale para el negocio y la <b>próxima mejor acción</b> recomendada.</p>
+    <p class="use"><b>Para qué te sirve:</b> atender con contexto total: antes
+    de llamar a alguien, mirá su ficha y sabé con quién estás hablando.</p>
+  </div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">7</div>
+      <h3>CRM · Venta y gestión</h3>
+      <span class="tag">Tu WhatsApp, en tablero</span>
+    </div>
+    <p><b>Qué te muestra:</b> el movimiento del CRM: cuántas conversaciones
+    tenés (abiertas y cerradas), cuántos mensajes entran y salen, cuánto
+    responde el asistente automático, y el <b>embudo de ventas</b> — Nuevo →
+    En conversación → Interesado → Cliente. Además <b>cruza cada contacto con
+    tu cartera</b>: ¿ya es cliente tuyo? ¿qué pólizas tiene? ¿tiene algo por
+    vencer?</p>
+    <p class="use"><b>Para qué te sirve:</b> no perder ninguna oportunidad, y
+    conectar la conversación con la venta: el que te está escribiendo puede ser
+    tu próximo cliente — o uno que está por renovar.</p>
+  </div>
+
+  <div class="mod">
+    <div class="mod-head">
+      <div class="mod-num">8</div>
+      <h3>Calidad y avance de migración</h3>
+      <span class="tag">El termómetro de la migración</span>
+    </div>
+    <p><b>Qué te muestra:</b> cuánto de tu información histórica ya quedó
+    vinculada con el sistema nuevo (clientes y gestiones), y qué falta cargar.</p>
+    <p class="use"><b>Para qué te sirve:</b> seguir la migración con números
+    reales, sin sorpresas, y saber cuándo el sistema nuevo ya tiene todo.</p>
+  </div>
+
+  <div class="note">
+    <b>Tip:</b> si un número te llama la atención, filtrá por ese mes u oficina
+    y bajá hasta el detalle: de los números grandes siempre se puede llegar al
+    caso concreto.
+  </div>
+
+  <div class="pfoot">
+    <span>Cockpit Rafael Allende · Manual de usuario</span>
+    <span>GPY · Sistemas Agénticos — pág. 4</span>
+  </div>
+</div>
+
+<!-- ============ PÁGINA 5 · LAS DOS BASES ============ -->
+<div class="page">
+  <div class="kicker">03 · Las dos bases, explicadas simple</div>
+  <div class="bar"></div>
+
+  <h2>Tu base histórica y el sistema nuevo, juntos</h2>
+  <p class="lead">
+    El tablero trabaja con dos mundos: lo que fue (tu historia) y lo que es
+    (la cartera nueva). Esto es lo que tenés que saber:
+  </p>
+
+  <div class="diagram">
+    <div class="dbox">
+      <b>📚 Base histórica</b>
+      <span>HISTÓRICO CONSOLIDADO · Rafael</span>
+    </div>
+    <div class="dbox">
+      <b>📗 Sistema nuevo</b>
+      <span>ACTUAL CARGADO · Seguros Agénticos</span>
+    </div>
+  </div>
+  <div class="darrow">▼ ▼</div>
+  <div class="dresult">Un solo negocio, en una sola pantalla</div>
+
+  <div class="todo" style="margin-top:16px">
+    <div><b>Se actualizan solos →</b><span>las dos bases se releen solas varias veces por hora y el CRM cada 2 horas. No hagas nada: lo que se carga o cambia aparece solo en el tablero.</span></div>
+    <div><b>Se limpian y unen →</b><span>el tablero normaliza los datos (nombres, teléfonos, DNI), los cruza y te muestra UN cliente con todo junto: su historia + sus pólizas + sus conversaciones.</span></div>
+    <div><b>Sin tocar nada →</b><span>tus bases no se mezclan ni se modifican por el tablero. La unión se hace «en memoria», solo para mostrarte la foto completa.</span></div>
+    <div><b>La fusión real →</b><span>la hace el sistema nuevo cuando terminás de cargar la migración. El tablero la mide y te muestra el avance (módulo 8).</span></div>
+  </div>
+
+  <div class="note">
+    <b>Regla de oro:</b> mientras la migración siga en curso, lo «cargado» en el
+    sistema nuevo <b>todavía no es la cartera completa</b> — por eso vas a ver
+    avisos de «en proceso de carga». Cuando el sistema nuevo tenga todo, el peso
+    del tablero pasa solo hacia él y la base histórica queda como archivo de
+    consulta. Nada se duplica y nada se pierde.
+  </div>
+
+  <h2 style="margin-top:18px">Lo que el tablero NO hace</h2>
+  <div class="cards2" style="margin-top:8px">
+    <div class="card">
+      <h3>✋ No escribe ni borra</h3>
+      <p>Solo mira. Tus sistemas y tus datos quedan exactamente como están.</p>
+    </div>
+    <div class="card">
+      <h3>🔁 No reemplaza a tus sistemas</h3>
+      <p>Es la vista de arriba que los resume. La gestión sigue en el CRM y en
+      el sistema de seguros.</p>
+    </div>
+  </div>
+
+  <div class="pfoot">
+    <span>Cockpit Rafael Allende · Manual de usuario</span>
+    <span>GPY · Sistemas Agénticos — pág. 5</span>
+  </div>
+</div>
+
+<!-- ============ PÁGINA 6 · FAQ + CIERRE ============ -->
+<div class="page">
+  <div class="kicker">04 · Preguntas frecuentes</div>
+  <div class="bar"></div>
+
+  <div class="qa">
+    <div class="q">¿Por qué un cliente aparece en el histórico pero no en la cartera nueva?</div>
+    <div class="a">Porque la migración va por etapas. Es normal que mientras esté en
+    proceso algunos clientes estén en una base y todavía no en la otra. El tablero
+    te lo muestra con etiquetas claras y te dice el avance.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q">¿Cada cuánto se actualiza la información?</div>
+    <div class="a">Sola: varias veces por hora para las dos bases de seguros y cada
+    2 horas para el CRM. Vos no tenés que apretar nada.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q">La primera vez tardó un poco, ¿por qué?</div>
+    <div class="a">Presentó el análisis completo de decenas de miles de registros.
+    Eso ya queda preparado en el servidor: de ahí en adelante abre al instante.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q">¿De dónde salen los datos?</div>
+    <div class="a">De tus propios sistemas: la base histórica, el sistema nuevo de
+    seguros y el CRM de WhatsApp. Se consultan sin tocarlos y sin modificar nada.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q">¿Puede entrar cualquiera con el link?</div>
+    <div class="a">El link es privado, para el equipo. Si querés que además pida
+    contraseña para entrar, se puede agregar.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q">¿Puedo bajar listas para hacer llamados?</div>
+    <div class="a">Hoy se consulta en pantalla, filtro por filtro. Exportar las
+    listas (renovaciones, reactivación) es una mejora que podemos sumar cuando
+    quieras.</div>
+  </div>
+
+  <h2 style="margin-top:20px">¿Qué ganás usando el tablero?</h2>
+  <div class="gain">
+    <div class="card">
+      <div class="big">10 min</div>
+      <p><b>para saber cómo viene el negocio</b>, en lugar de juntar números de varios lados</p>
+    </div>
+    <div class="card">
+      <div class="big">0</div>
+      <p><b>renovaciones que se escapan</b> sin que te enteres con tiempo</p>
+    </div>
+    <div class="card">
+      <div class="big">+1</div>
+      <p><b>oportunidad por cada charla del CRM</b> que se conecta con tu cartera</p>
+    </div>
+  </div>
+
+  <div class="sign">
+    <b>¿Dudas, ideas o algo que no cierre?</b> Hablá con nosotros y lo ajustamos:
+    el tablero está pensado para crecer con tu negocio. — <b>GPY · Sistemas Agénticos</b><br>
+    Documento del 12/09/2026. Los datos que muestra el tablero son reales y se
+    actualizan solos.
+  </div>
+
+  <div class="pfoot">
+    <span>Cockpit Rafael Allende · Manual de usuario</span>
+    <span>GPY · Sistemas Agénticos — pág. 6</span>
+  </div>
+</div>
+
+</body>
+</html>
