@@ -460,6 +460,8 @@ export async function buildDashboard(
           agenticConfig.clientFields.email
         ]
       ),
+
+      createdTime: record.createdTime,
     }));
 
   /*
@@ -621,6 +623,8 @@ export async function buildDashboard(
               .activePremium
           ]
         ),
+
+        createdTime: record.createdTime,
       };
     });
 
@@ -747,6 +751,119 @@ export async function buildDashboard(
   });
 
   /*
+   * 5.5 OFICINA DERIVADA POR CLIENTE.
+   *
+   * Las pólizas no traen oficina cargada, así que la oficina del
+   * cliente se deriva de sus gestiones históricas (la más frecuente;
+   * si hay empate, la de la gestión más reciente). Con esto el filtro
+   * de Oficina también alcanza cartera, retención, reactivación y la
+   * búsqueda de Clientes del 360.
+   */
+
+  const clientOfficeStats = new Map<
+    string,
+    {
+      counts: Map<string, number>;
+      latest: string;
+      latestDate: string;
+    }
+  >();
+
+  historic.forEach((record) => {
+    if (!record.clientId || !record.office) {
+      return;
+    }
+
+    let entry = clientOfficeStats.get(
+      record.clientId
+    );
+
+    if (!entry) {
+      entry = {
+        counts: new Map<string, number>(),
+        latest: "",
+        latestDate: "",
+      };
+
+      clientOfficeStats.set(
+        record.clientId,
+        entry
+      );
+    }
+
+    entry.counts.set(
+      record.office,
+      (entry.counts.get(record.office) || 0) +
+        1
+    );
+
+    if ((record.date || "") >= entry.latestDate) {
+      entry.latestDate = record.date || "";
+      entry.latest = record.office;
+    }
+  });
+
+  const clientOffice = new Map<string, string>();
+
+  clientOfficeStats.forEach((entry, clientId) => {
+    let best = entry.latest;
+    let bestCount = -1;
+
+    entry.counts.forEach((count, office) => {
+      if (count > bestCount) {
+        best = office;
+        bestCount = count;
+      }
+    });
+
+    clientOffice.set(clientId, best);
+  });
+
+  function normalizeOfficeName(value?: string) {
+    return (value || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s*\(\d+\)\s*$/, "")
+      .replace(/\s+/g, " ");
+  }
+
+  const officeWanted = normalizeOfficeName(
+    filters.office
+  );
+
+  function officeMatches(clientId: string) {
+    if (!filters.office) {
+      return true;
+    }
+
+    return (
+      normalizeOfficeName(
+        clientOffice.get(clientId)
+      ) === officeWanted
+    );
+  }
+
+  function policyMatchesOffice(
+    policy: PolicyCompact
+  ) {
+    if (!filters.office) {
+      return true;
+    }
+
+    if (
+      policy.office &&
+      normalizeOfficeName(policy.office) ===
+        officeWanted
+    ) {
+      return true;
+    }
+
+    return policy.clientIds.some((clientId) =>
+      officeMatches(clientId)
+    );
+  }
+
+  /*
    * 6. FILTROS
    */
 
@@ -809,10 +926,13 @@ export async function buildDashboard(
       }
 
       if (
-        filters.office &&
-        policy.office &&
-        policy.office !== filters.office
+        filters.employee &&
+        policy.employee !== filters.employee
       ) {
+        return false;
+      }
+
+      if (!policyMatchesOffice(policy)) {
         return false;
       }
 
@@ -1090,14 +1210,16 @@ export async function buildDashboard(
 
       if (
         history.altas > 0 &&
-        activeCount === 0
+        activeCount === 0 &&
+        officeMatches(clientId)
       ) {
         reactivationCandidates++;
       }
 
       if (
         activeCount > 0 &&
-        history.anulaciones > 0
+        history.anulaciones > 0 &&
+        officeMatches(clientId)
       ) {
         retentionWatch++;
       }
@@ -1241,7 +1363,21 @@ export async function buildDashboard(
    * 14. CUSTOMER 360
    */
 
-  let selectedClients = clients;
+  // Las últimas 100 altas: más recientes primero. Si hay filtro de
+  // oficina, se aplica sobre la oficina derivada del cliente.
+  const scopedClients = filters.office
+    ? clients.filter((client) =>
+        officeMatches(client.id)
+      )
+    : clients;
+
+  let selectedClients = scopedClients
+    .slice()
+    .sort((a, b) =>
+      (b.createdTime || "").localeCompare(
+        a.createdTime || ""
+      )
+    );
 
   if (filters.search) {
     const query =
@@ -1251,7 +1387,7 @@ export async function buildDashboard(
       normalizeDni(filters.search);
 
     selectedClients =
-      clients.filter((client) => {
+      scopedClients.filter((client) => {
         if (
           normalizeName(client.name).includes(
             query
@@ -1279,12 +1415,12 @@ export async function buildDashboard(
   }
 
   const customerStats = {
-    total: clients.length,
+    total: scopedClients.length,
     matched: selectedClients.length,
   };
 
   selectedClients =
-    selectedClients.slice(0, 50);
+    selectedClients.slice(0, 100);
 
   /*
    * Link directo a la ficha del cliente en el BACKOFFICE
@@ -1581,7 +1717,7 @@ export async function buildDashboard(
       )
     );
 
-  const LIST_CAP = 150;
+  const LIST_CAP = 100;
 
   const lists: Record<string, DrillList[]> = {
     pulso: [],
@@ -1643,7 +1779,7 @@ export async function buildDashboard(
       .sort((a, b) =>
         (b.date || "").localeCompare(a.date || "")
       )
-      .slice(0, 80);
+      .slice(0, LIST_CAP);
 
     lists.pulso.push({
       id: pulse.id,
@@ -1858,7 +1994,8 @@ export async function buildDashboard(
     .filter(
       ([clientId, history]) =>
         clientActiveCount(clientId) > 0 &&
-        history.anulaciones > 0
+        history.anulaciones > 0 &&
+        officeMatches(clientId)
     )
     .sort(
       (a, b) =>
@@ -1904,7 +2041,8 @@ export async function buildDashboard(
     .filter(
       ([clientId, history]) =>
         history.altas > 0 &&
-        clientActiveCount(clientId) === 0
+        clientActiveCount(clientId) === 0 &&
+        officeMatches(clientId)
     )
     .sort(
       (a, b) =>
@@ -2138,12 +2276,18 @@ export async function buildDashboard(
       ),
   });
 
-  const incompletePolicies = policies.filter(
-    (policy) =>
-      !policy.product ||
-      !policy.company ||
-      !policy.expiryDate
-  );
+  const incompletePolicies = policies
+    .filter(
+      (policy) =>
+        !policy.product ||
+        !policy.company ||
+        !policy.expiryDate
+    )
+    .sort((a, b) =>
+      (b.createdTime || "").localeCompare(
+        a.createdTime || ""
+      )
+    );
 
   lists.migracion.push({
     id: "incomplete",

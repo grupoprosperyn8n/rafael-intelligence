@@ -638,14 +638,13 @@ function ModuleLists({
             <span className="mod-lists-print">
               {normalized
                 ? `${visible.length} de ${current.items.length}`
-                : `${current.shown} de ${number(
-                    current.total
-                  )}`}
-
-              {!normalized &&
-              current.total > current.shown
-                ? " · primeros registros"
-                : ""}
+                : current.total > current.shown
+                  ? `Últimas ${current.shown} de ${number(
+                      current.total
+                    )}`
+                  : `${number(current.total)} registro${
+                      current.total === 1 ? "" : "s"
+                    }`}
             </span>
 
             <button
@@ -3115,10 +3114,10 @@ export default function ExecutiveDashboard() {
                   : data.customerStats &&
                     data.customerStats.matched >
                       data.customers.length
-                    ? `Mostrando los primeros ${data.customers.length} de ${data.customerStats.matched} resultados. Afiná la búsqueda para ver menos.`
+                    ? `Mostrando las últimas ${data.customers.length} de ${data.customerStats.matched} coincidencias. Afiná la búsqueda para ver menos.`
                     : `${data.customers.length} resultado${data.customers.length === 1 ? "" : "s"}.`
                 : data.customerStats
-                  ? `Mostrando ${data.customers.length} de ${data.customerStats.total} clientes cargados. Buscá por nombre, DNI o teléfono para ir directo a una ficha.`
+                  ? `Últimas ${data.customers.length} de ${data.customerStats.total} clientes cargados (los más recientes). Buscá por nombre, DNI o teléfono para ir directo a una ficha.`
                   : ""}
             </p>
 

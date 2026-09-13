@@ -202,7 +202,7 @@ export const MODULE_HELP: Record<
     usage: [
       "Buscá por nombre, DNI o teléfono (coincidencia parcial).",
       "Antes de llamar, leé la «próxima mejor acción» y el score.",
-      "Sin búsqueda, ves los primeros 50 clientes del maestro.",
+      "Sin búsqueda, ves las últimas 100 altas del maestro de clientes.",
     ],
     suggestions: [
       {

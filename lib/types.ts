@@ -54,6 +54,8 @@ export type PolicyCompact = {
 
   premium: number;
   activePremium: number;
+
+  createdTime?: string;
 };
 
 export type ClientCompact = {
@@ -65,6 +67,8 @@ export type ClientCompact = {
   dni?: string;
   phone?: string;
   email?: string;
+
+  createdTime?: string;
 };
 
 export type DashboardResponse = {
