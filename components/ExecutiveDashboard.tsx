@@ -1975,6 +1975,46 @@ export default function ExecutiveDashboard() {
                           customer.recommendation
                         }
                       </strong>
+
+                      {customer.recommendationWhy && (
+                        <p className="reco-why">
+                          {
+                            customer.recommendationWhy
+                          }
+                        </p>
+                      )}
+
+                      {customer
+                        .recommendationSteps
+                        ?.length > 0 && (
+                        <ul className="reco-steps">
+                          {customer.recommendationSteps.map(
+                            (step) => (
+                              <li key={step}>
+                                {step}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      )}
+
+                      {customer.backendUrl && (
+                        <a
+                          className="reco-link"
+                          href={
+                            customer.backendUrl
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Abrir la ficha de este cliente en el sistema"
+                        >
+                          Abrir ficha en el
+                          sistema
+                          <ArrowUpRight
+                            size={13}
+                          />
+                        </a>
+                      )}
                     </div>
                   </article>
                 )

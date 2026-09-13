@@ -825,6 +825,64 @@ th {
   color: var(--primary);
 }
 
+.reco-why {
+  margin: 8px 0 0;
+
+  color: var(--text);
+
+  font-size: 12px;
+
+  line-height: 1.5;
+}
+
+.reco-steps {
+  margin: 8px 0 0;
+
+  padding-left: 16px;
+
+  display: grid;
+
+  gap: 4px;
+}
+
+.reco-steps li {
+  color: var(--muted);
+
+  font-size: 12px;
+
+  line-height: 1.45;
+}
+
+.reco-link {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 5px;
+
+  margin-top: 11px;
+
+  padding: 8px 13px;
+
+  border-radius: 999px;
+
+  border: 1px solid #cfe0ff;
+
+  background: #f4f8ff;
+
+  color: var(--primary);
+
+  font-size: 12px;
+
+  font-weight: 700;
+
+  text-decoration: none;
+}
+
+.reco-link:hover {
+  background: #e8f1ff;
+}
+
 .quality-grid {
   display: grid;
 

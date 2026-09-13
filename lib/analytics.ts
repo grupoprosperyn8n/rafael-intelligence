@@ -1,5 +1,5 @@
 import { CONFIG } from "./config";
-import { airtableTable } from "./airtable";
+import { airtableTable, airtableTableId } from "./airtable";
 
 import {
   ClientCompact,
@@ -161,6 +161,100 @@ function recommendationForClient(args: {
   }
 
   return "Seguimiento comercial";
+}
+
+/*
+ * Plan de acción: para el dueño, cada recomendación viene con
+ * el "por qué" (corto, en criollo) y "qué hacer" paso a paso.
+ */
+function recommendationPlan(args: {
+  recommendation: string;
+  activePolicies: number;
+  historicAltas: number;
+  historicAnulaciones: number;
+  historicSiniestros: number;
+  activeProducts: string[];
+  historicProducts: string[];
+}) {
+  const activeList = args.activeProducts.join(", ");
+
+  const historicList = args.historicProducts.join(", ");
+
+  switch (args.recommendation) {
+    case "Prioridad alta de reactivación":
+      return {
+        why: `Registra ${args.historicAltas} alta(s) en la historia y hoy no tiene pólizas activas cargadas${
+          historicList
+            ? ` (en su historia: ${historicList})`
+            : ""
+        }. Recuperar a alguien que ya confió es la venta más fácil.`,
+        steps: [
+          `Llamalo y ofrecele reactivar su cobertura${
+            args.historicProducts[0]
+              ? ` de ${args.historicProducts[0]}`
+              : ""
+          }.`,
+          "Recordale que ya fue cliente y preguntá qué lo hizo cancelar.",
+          "Si no contesta, dejale un mensaje con una promo de reactivación y agendá el seguimiento.",
+        ],
+      };
+
+    case "Oportunidad de venta cruzada":
+      return {
+        why: `Tiene exactamente 1 póliza activa${
+          activeList ? ` (${activeList})` : ""
+        } y el resto de sus necesidades quedó sin cubrir.`,
+        steps: [
+          "Ofrecele sumar un producto complementario a lo que ya tiene.",
+          `Revisá en Venta cruzada qué producto rinde más${
+            activeList
+              ? ` junto a ${activeList}`
+              : ""
+          }.`,
+          "El mejor momento para ampliar la cobertura es antes de la renovación.",
+        ],
+      };
+
+    case "Revisar retención y experiencia":
+      return {
+        why: `Tiene ${args.activePolicies} póliza(s) activa(s) y ${args.historicAnulaciones} anulación(es) en la historia: ya canceló productos antes.`,
+        steps: [
+          "Llamalo para saber cómo le fue con el servicio antes de la renovación.",
+          "Revisá en Retención si le vence alguna póliza en los próximos 30 días.",
+          "Si hubo un problema, resolvelo antes de ofrecerle algo nuevo.",
+        ],
+      };
+
+    case "Seguimiento post-siniestro":
+      return {
+        why: `Tiene ${args.activePolicies} póliza(s) activa(s) y ${args.historicSiniestros} siniestro(s) en la historia: está pasando por un momento delicado.`,
+        steps: [
+          "Contactalo para chequear cómo salió del siniestro.",
+          "Reforzale la tranquilidad de estar cubierto: es fidelización pura.",
+          "Aprovechá la charla para completar coberturas que le falten.",
+        ],
+      };
+
+    case "Cliente consolidado":
+      return {
+        why: `Es de los mejores clientes: ${args.activePolicies} pólizas activas.`,
+        steps: [
+          "Asegurá que todas sus renovaciones estén al día.",
+          "Ofrecele una revisión anual de coberturas.",
+          "Pedile un referido: los clientes fieles son la mejor puerta de entrada.",
+        ],
+      };
+
+    default:
+      return {
+        why: `Todavía no muestra señales fuertes: ${args.activePolicies} activa(s) y ${args.historicAltas} alta(s) histórica(s).`,
+        steps: [
+          "Mantenelo en la ronda de contacto periódica.",
+          "Verificá en Retención si hay algo por vencer.",
+          "Si aparece una promo que le sirva, avisale.",
+        ],
+      };
+  }
 }
 
 function scoreClient(args: {
@@ -1184,6 +1278,23 @@ export async function buildDashboard(
   selectedClients =
     selectedClients.slice(0, 50);
 
+  /*
+   * Link directo a la ficha del cliente en el backend (Airtable):
+   * base agéntica + tabla CLIENTES + id del registro.
+   */
+  const clientsTableId = await airtableTableId(
+    CONFIG.agentic.baseId,
+    CONFIG.agentic.tables.clients
+  );
+
+  const clientBackendUrl = (recordId: string) =>
+    `https://airtable.com/${
+      CONFIG.agentic.baseId
+    }/${
+      clientsTableId ||
+      encodeURIComponent(CONFIG.agentic.tables.clients)
+    }/${recordId}`;
+
   const customer360 =
     selectedClients.map((client) => {
       const history =
@@ -1212,6 +1323,36 @@ export async function buildDashboard(
         activePremium: premium,
       };
 
+      const activeProducts = [
+        ...new Set(
+          active
+            .map((policy) => policy.product)
+            .filter(
+              (value): value is string =>
+                Boolean(value)
+            )
+        ),
+      ].slice(0, 3);
+
+      const historicProducts = [
+        ...(history?.products || []),
+      ].slice(0, 3);
+
+      const recommendation =
+        recommendationForClient(metrics);
+
+      const plan = recommendationPlan({
+        recommendation,
+        activePolicies: metrics.activePolicies,
+        historicAltas: metrics.historicAltas,
+        historicAnulaciones:
+          metrics.historicAnulaciones,
+        historicSiniestros:
+          metrics.historicSiniestros,
+        activeProducts,
+        historicProducts,
+      });
+
       return {
         id: client.id,
         name: client.name,
@@ -1238,8 +1379,14 @@ export async function buildDashboard(
         score:
           scoreClient(metrics),
 
-        recommendation:
-          recommendationForClient(metrics),
+        recommendation,
+
+        recommendationWhy: plan.why,
+
+        recommendationSteps: plan.steps,
+
+        backendUrl:
+          clientBackendUrl(client.id),
       };
     });
 

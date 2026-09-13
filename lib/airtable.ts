@@ -99,3 +99,57 @@ export async function airtableTable(
 export function clearDashboardCache() {
   cache.clear();
 }
+
+const metaCache = new Map<string, string>();
+
+/*
+ * Resuelve el ID real de una tabla (tblXXXX) para armar links directos
+ * al backend (Airtable). Se cachea por proceso: los IDs no cambian.
+ */
+export async function airtableTableId(
+  baseId: string,
+  tableName: string
+): Promise<string | null> {
+  const cacheKey = `${baseId}:${tableName}`;
+
+  const cached = metaCache.get(cacheKey);
+
+  if (cached) return cached;
+  if (!TOKEN) return null;
+
+  try {
+    const response = await fetch(
+      `https://api.airtable.com/v0/meta/bases/${baseId}/tables`,
+      {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`meta ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const table = (data.tables || []).find(
+      (item: { name?: string }) =>
+        item.name === tableName
+    );
+
+    if (!table?.id) return null;
+
+    metaCache.set(cacheKey, table.id);
+
+    return table.id;
+  } catch (error) {
+    console.warn(
+      `No se pudo resolver la tabla ${tableName} para links al backend.`,
+      error
+    );
+
+    return null;
+  }
+}

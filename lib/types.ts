@@ -178,6 +178,11 @@ export type DashboardResponse = {
 
     score: number;
     recommendation: string;
+
+    recommendationWhy: string;
+    recommendationSteps: string[];
+
+    backendUrl: string;
   }[];
 
   crm: CrmAnalytics;
