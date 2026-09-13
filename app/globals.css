@@ -1830,7 +1830,17 @@ footer {
 
 .mod-list-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.05fr) 1.6fr auto;
+  /*
+   * Columnas 100% proporcionales (mínimo 0) para que TODAS las
+   * filas compartan la misma geometría: la columna del medio
+   * arranca siempre en el mismo X, por más que los nombres
+   * varíen de largo. (Antes: minmax(180px, 1.05fr) → el nombre
+   * largo ensanchaba la 1ª columna y corría la del medio.)
+   */
+  grid-template-columns:
+    minmax(0, 0.9fr)
+    minmax(0, 1.65fr)
+    minmax(0, 0.75fr);
   gap: 12px;
   align-items: center;
   padding: 9px 8px;
