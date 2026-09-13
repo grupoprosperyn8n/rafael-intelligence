@@ -2006,10 +2006,10 @@ export default function ExecutiveDashboard() {
                           }
                           target="_blank"
                           rel="noreferrer"
-                          title="Abrir la ficha de este cliente en el sistema"
+                          title="Abrir la ficha de este cliente en el backoffice"
                         >
                           Abrir ficha en el
-                          sistema
+                          backoffice
                           <ArrowUpRight
                             size={13}
                           />

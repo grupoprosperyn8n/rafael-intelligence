@@ -1,5 +1,5 @@
 import { CONFIG } from "./config";
-import { airtableTable, airtableTableId } from "./airtable";
+import { airtableTable } from "./airtable";
 
 import {
   ClientCompact,
@@ -1279,21 +1279,12 @@ export async function buildDashboard(
     selectedClients.slice(0, 50);
 
   /*
-   * Link directo a la ficha del cliente en el backend (Airtable):
-   * base agéntica + tabla CLIENTES + id del registro.
+   * Link directo a la ficha del cliente en el BACKOFFICE
+   * (interfaz nativa de Airtable, NO la base de datos):
+   * base agéntica + página de la interfaz + id del registro.
    */
-  const clientsTableId = await airtableTableId(
-    CONFIG.agentic.baseId,
-    CONFIG.agentic.tables.clients
-  );
-
   const clientBackendUrl = (recordId: string) =>
-    `https://airtable.com/${
-      CONFIG.agentic.baseId
-    }/${
-      clientsTableId ||
-      encodeURIComponent(CONFIG.agentic.tables.clients)
-    }/${recordId}`;
+    `https://airtable.com/${CONFIG.agentic.baseId}/${CONFIG.backoffice.clientsPage}/${recordId}`;
 
   const customer360 =
     selectedClients.map((client) => {

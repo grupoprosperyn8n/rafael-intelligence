@@ -82,4 +82,17 @@ export const CONFIG = {
       name: "NOMBRE",
     },
   },
+
+  /*
+   * BACKOFFICE — interfaz nativa de Airtable (páginas "pag...").
+   * El botón "Abrir ficha en el backoffice" del Cliente 360° abre:
+   *   https://airtable.com/{baseId}/{clientsPage}/{recordId}
+   * Patrón oficial de Airtable para linkear la ficha de un registro
+   * dentro de la interfaz (compartible con usuarios que tengan acceso).
+   */
+  backoffice: {
+    clientsPage:
+      process.env.AIRTABLE_BACKOFFICE_CLIENTS_PAGE ||
+      "pagloDiKehe3EMnT4",
+  },
 };
