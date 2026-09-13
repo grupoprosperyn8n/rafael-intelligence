@@ -21,10 +21,14 @@
  * controlar el costo; y nunca devolvemos un error sin mensaje claro.
  */
 
+import { MODULE_AI_IDS } from "./types";
+
 import type {
   ClientInsight,
   ClientInsightContext,
   InsightMode,
+  ModuleAiId,
+  ModuleInsight,
 } from "./types";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -190,7 +194,8 @@ function toInsight(
 
 async function callChatCompletions(
   system: string,
-  user: string
+  user: string,
+  maxTokens = 600
 ): Promise<string> {
   const token = process.env.AI_API_TOKEN?.trim();
 
@@ -222,7 +227,7 @@ async function callChatCompletions(
             { role: "user", content: user },
           ],
           temperature: 0.4,
-          max_tokens: 600,
+          max_tokens: maxTokens,
         }),
         signal: controller.signal,
       }
@@ -327,3 +332,264 @@ export async function generateInsight(
     new Error("La IA no respondió. Probá de nuevo.")
   );
 }
+
+/* ------------------------------------------------------------------------ *
+ * Capa IA de MÓDULOS del tablero: Pulso, Cartera, Retención, Reactivación,
+ * Venta cruzada, Calidad de migración y CRM.
+ *
+ * Misma filosofía que el Cliente 360°: contexto cerrado con los números
+ * reales del módulo (los arma el dashboard), JSON estricto, cache por
+ * módulo+modo 6 h y el token SIEMPRE server-side.
+ * ------------------------------------------------------------------------ */
+
+const MODULE_BRIEFS: Record<
+  ModuleAiId,
+  { title: string; brief: string; expectsMessage: boolean }
+> = {
+  pulso: {
+    title: "Pulso del negocio",
+    brief:
+      "la foto general del negocio: altas, anulaciones, crecimiento neto, siniestros, cotizaciones y evolución mensual",
+    expectsMessage: false,
+  },
+  cartera: {
+    title: "Cartera",
+    brief:
+      "las pólizas cargadas y activas, la prima que representan y el reparto por producto, compañía y oficina",
+    expectsMessage: false,
+  },
+  retencion: {
+    title: "Retención",
+    brief:
+      "las renovaciones que se vienen (vencimientos en ≤7 y ≤30 días), los clientes a observar por anulaciones históricas y los siniestros",
+    expectsMessage: true,
+  },
+  reactivacion: {
+    title: "Reactivación",
+    brief:
+      "los clientes históricos que hoy no tienen póliza activa cargada y el universo potencial para recontactarlos",
+    expectsMessage: true,
+  },
+  cross: {
+    title: "Venta cruzada",
+    brief:
+      "los clientes con una sola póliza activa y las oportunidades de sumar productos (por ejemplo Auto → Auxilio/Hogar/Vida)",
+    expectsMessage: true,
+  },
+  migracion: {
+    title: "Calidad y avance de la migración",
+    brief:
+      "el avance de la migración de datos: cuánto quedó vinculado entre clientes y gestiones y qué campos faltan completar",
+    expectsMessage: false,
+  },
+  crm: {
+    title: "CRM · Venta y gestión",
+    brief:
+      "el pulso comercial del CRM: contactos, conversaciones, mensajes (incluida la IA del agente), leads, conversión, pipeline y el vínculo con la cartera",
+    expectsMessage: false,
+  },
+};
+
+const MODULE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+const moduleCache = new Map<
+  string,
+  { insight: ModuleInsight; ts: number }
+>();
+
+export function isModuleAiId(
+  value: string
+): value is ModuleAiId {
+  return (MODULE_AI_IDS as readonly string[]).includes(
+    value
+  );
+}
+
+function contextLines(
+  context: Record<string, unknown>
+): string[] {
+  const lines: string[] = [];
+
+  for (const [key, value] of Object.entries(
+    context
+  )) {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      continue;
+    }
+
+    const text = Array.isArray(value)
+      ? value
+          .filter(
+            (item) =>
+              item !== null &&
+              item !== undefined &&
+              item !== ""
+          )
+          .slice(0, 12)
+          .map((item) => String(item).slice(0, 220))
+          .join(" · ")
+      : String(value).slice(0, 400);
+
+    if (!text) {
+      continue;
+    }
+
+    lines.push(`- ${key}: ${text}`);
+
+    if (lines.length >= 60) {
+      break;
+    }
+  }
+
+  return lines;
+}
+
+function buildModulePrompt(
+  module: ModuleAiId,
+  context: Record<string, unknown>
+): { system: string; user: string } {
+  const brief = MODULE_BRIEFS[module];
+
+  const system = [
+    "Sos el analista de negocio de Rafael Allende, broker de seguros en Argentina.",
+    "Escribís en español rioplatense, claro y directo, tratando de vos; te lee el dueño o gerente del negocio, no un técnico.",
+    `Estás analizando el módulo "${brief.title}" del tablero de gestión, que muestra ${brief.brief}.`,
+    "REGLAS ESTRICTAS: usá SOLO los datos del contexto; no inventes cifras, clientes ni situaciones; si un dato no está, no lo supongas; no uses emojis.",
+    'Devolvé SOLO un JSON válido, sin texto extra, con esta forma exacta: {"resumen": "...", "focos": ["...", "..."], "acciones": ["...", "..."], "mensaje": "..."}',
+    '"resumen": 2 o 3 frases con lo más importante que dicen los datos (incluí los números clave).',
+    '"focos": 3 o 4 puntos cortos de qué mirar y por qué, mirando los números del módulo.',
+    '"acciones": 3 a 5 acciones concretas y priorizadas para esta semana.',
+    brief.expectsMessage
+      ? '"mensaje": un mensaje breve de WhatsApp (máximo 60 palabras, cordial, con la firma de Rafael Allende) listo para enviar a un cliente tipo de este módulo.'
+      : '"mensaje": cadena vacía, este módulo no requiere mensaje al cliente.',
+  ].join("\n");
+
+  const user = [
+    "DATOS REALES DEL MÓDULO:",
+    ...contextLines(context),
+    "",
+    "TAREA: leé estos números como analista de negocio del dueño y devolvé el JSON pedido.",
+  ].join("\n");
+
+  return { system, user };
+}
+
+function toModuleInsight(
+  raw: unknown,
+  model: string
+): ModuleInsight | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const data = raw as Record<string, unknown>;
+
+  const resumen = String(data.resumen || "")
+    .trim()
+    .slice(0, 900);
+
+  const mensaje = String(data.mensaje || "")
+    .trim()
+    .slice(0, 900);
+
+  const toList = (value: unknown, max: number) =>
+    Array.isArray(value)
+      ? value
+          .map((item) =>
+            String(item).trim().slice(0, 400)
+          )
+          .filter(Boolean)
+          .slice(0, max)
+      : [];
+
+  const focos = toList(data.focos, 6);
+  const acciones = toList(data.acciones, 6);
+
+  if (!resumen || acciones.length === 0) {
+    return null;
+  }
+
+  return {
+    resumen,
+    focos,
+    acciones,
+    mensaje,
+    model,
+    generatedAt: new Date().toISOString(),
+    cached: false,
+  };
+}
+
+export async function generateModuleInsight(
+  module: ModuleAiId,
+  mode: "dual" | "ia",
+  context: Record<string, unknown>,
+  force = false
+): Promise<ModuleInsight> {
+  const key = `module:${module}:${mode}`;
+  const hit = moduleCache.get(key);
+
+  if (
+    !force &&
+    hit &&
+    Date.now() - hit.ts < MODULE_CACHE_TTL_MS
+  ) {
+    return { ...hit.insight, cached: true };
+  }
+
+  if (!takeDailySlot()) {
+    throw new Error(
+      "Se alcanzó el límite diario de análisis con IA. Probá de nuevo mañana."
+    );
+  }
+
+  const { system, user } = buildModulePrompt(
+    module,
+    context
+  );
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const content = await callChatCompletions(
+        system,
+        user,
+        900
+      );
+
+      const insight = toModuleInsight(
+        extractJson(content),
+        aiModel()
+      );
+
+      if (!insight) {
+        throw new Error(
+          "La IA no devolvió un análisis en el formato esperado."
+        );
+      }
+
+      moduleCache.set(key, {
+        insight,
+        ts: Date.now(),
+      });
+
+      return insight;
+    } catch (error) {
+      lastError =
+        error instanceof Error
+          ? error
+          : new Error(String(error));
+    }
+  }
+
+  throw (
+    lastError ||
+    new Error("La IA no respondió. Probá de nuevo.")
+  );
+}
+

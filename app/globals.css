@@ -1666,3 +1666,22 @@ footer {
   color: var(--muted);
   font-size: 10px;
 }
+
+/* IA de módulos: fila del motor + panel de análisis arriba de cada módulo */
+.module-ai {
+  margin-bottom: 16px;
+}
+
+.module-ai .ia-block {
+  margin-top: 10px;
+}
+
+.ia-subhead {
+  display: block;
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

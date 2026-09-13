@@ -371,3 +371,31 @@ export type ClientInsight = {
   generatedAt: string;
   cached: boolean;
 };
+
+/*
+ * Capa IA de MÓDULOS del tablero (Pulso, Cartera, Retención, Reactivación,
+ * Venta cruzada, Migración y CRM): cada módulo puede generar un análisis
+ * sobre sus datos reales (resumen + focos + acciones), en modo dual o solo IA.
+ */
+
+export const MODULE_AI_IDS = [
+  "pulso",
+  "cartera",
+  "retencion",
+  "reactivacion",
+  "cross",
+  "migracion",
+  "crm",
+] as const;
+
+export type ModuleAiId = (typeof MODULE_AI_IDS)[number];
+
+export type ModuleInsight = {
+  resumen: string;
+  focos: string[];
+  acciones: string[];
+  mensaje: string;
+  model: string;
+  generatedAt: string;
+  cached: boolean;
+};

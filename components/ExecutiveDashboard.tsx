@@ -50,10 +50,14 @@ import {
   X,
 } from "lucide-react";
 
+import { MODULE_AI_IDS } from "@/lib/types";
+
 import type {
   ClientInsight,
   DashboardResponse,
   InsightMode,
+  ModuleAiId,
+  ModuleInsight,
 } from "@/lib/types";
 
 import {
@@ -477,6 +481,214 @@ function SuggestionsStrip({
   );
 }
 
+const MODULE_AI_TITLES: Record<ModuleAiId, string> = {
+  pulso: "Pulso del negocio",
+  cartera: "Cartera",
+  retencion: "Retención",
+  reactivacion: "Reactivación",
+  cross: "Venta cruzada",
+  migracion: "Calidad y avance de la migración",
+  crm: "CRM · Venta y gestión",
+};
+
+/*
+ * Fila de IA de un módulo: selector de motor (algoritmo / dual / solo IA)
+ * + panel de análisis. En "solo IA" el análisis se genera automáticamente;
+ * en "dual" se genera cuando el usuario lo pide.
+ */
+function ModuleAiRow({
+  id,
+  engine,
+  onEngine,
+  state,
+  onGenerate,
+  onCopy,
+  copied,
+}: {
+  id: ModuleAiId;
+  engine: InsightMode;
+  onEngine: (mode: InsightMode) => void;
+  state?: {
+    status: "loading" | "error" | "done";
+    data?: ModuleInsight;
+    error?: string;
+  };
+  onGenerate: () => void;
+  onCopy: (text: string) => void;
+  copied: boolean;
+}) {
+  const label = MODULE_AI_TITLES[id];
+
+  const insight =
+    state?.status === "done" ? state.data : undefined;
+
+  useEffect(() => {
+    if (engine === "ia" && !state) {
+      onGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine]);
+
+  return (
+    <div className="module-ai">
+      <div
+        className="engine-switch"
+        role="group"
+        aria-label={`Motor de sugerencias · ${label}`}
+      >
+        <span className="engine-switch-label">
+          Motor
+        </span>
+
+        <button
+          className={`engine-option${
+            engine === "algoritmo" ? " active" : ""
+          }`}
+          onClick={() => onEngine("algoritmo")}
+          title="Solo los datos y reglas del sistema, sin IA"
+        >
+          Algoritmo solo
+        </button>
+
+        <button
+          className={`engine-option${
+            engine === "dual" ? " active" : ""
+          }`}
+          onClick={() => onEngine("dual")}
+          title="Los datos del módulo + la lectura de la IA cuando la pidas"
+        >
+          Dual (IA + datos)
+        </button>
+
+        <button
+          className={`engine-option${
+            engine === "ia" ? " active" : ""
+          }`}
+          onClick={() => onEngine("ia")}
+          title="La IA lee los datos reales del módulo y arma el resumen y las acciones; se genera sola"
+        >
+          Solo IA
+        </button>
+
+        <span className="engine-hint">
+          {engine === "algoritmo" &&
+            "Sin IA: solo los datos y las reglas del sistema."}
+          {engine === "dual" &&
+            "Los datos del módulo + la lectura de la IA (la generás cuando quieras)."}
+          {engine === "ia" &&
+            "La IA lee los datos reales de este módulo y arma el resumen y las acciones; se genera sola."}
+        </span>
+      </div>
+
+      {engine !== "algoritmo" && (
+        <div
+          className={`ia-block${
+            engine === "ia" ? " primary" : ""
+          }`}
+        >
+          <span className="ia-badge">
+            <Sparkles size={12} />
+            {engine === "ia"
+              ? `Análisis con IA · ${label}`
+              : `Análisis IA (extra) · ${label}`}
+          </span>
+
+          {state?.status === "loading" && (
+            <div className="ia-loading">
+              Generando análisis con la IA…
+            </div>
+          )}
+
+          {!state && (
+            <button
+              className="ia-button"
+              onClick={onGenerate}
+            >
+              <Sparkles size={13} />
+              Generar análisis con IA
+            </button>
+          )}
+
+          {state?.status === "error" && (
+            <div className="ia-error">
+              <span>{state.error}</span>
+
+              <button
+                className="ia-button"
+                onClick={onGenerate}
+              >
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {insight && (
+            <>
+              <p className="ia-why">
+                {insight.resumen}
+              </p>
+
+              {insight.focos.length > 0 && (
+                <>
+                  <span className="ia-subhead">
+                    Qué mirar
+                  </span>
+
+                  <ul className="reco-steps">
+                    {insight.focos.map((foco) => (
+                      <li key={foco}>{foco}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {insight.acciones.length > 0 && (
+                <>
+                  <span className="ia-subhead">
+                    Qué hacer
+                  </span>
+
+                  <ul className="reco-steps">
+                    {insight.acciones.map(
+                      (accion) => (
+                        <li key={accion}>
+                          {accion}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </>
+              )}
+
+              {insight.mensaje && (
+                <div className="ia-message">
+                  <p>{insight.mensaje}</p>
+
+                  <button
+                    className="ia-copy"
+                    onClick={() =>
+                      onCopy(insight.mensaje)
+                    }
+                  >
+                    {copied
+                      ? "Copiado ✓"
+                      : "Copiar mensaje"}
+                  </button>
+                </div>
+              )}
+
+              <span className="ia-meta">
+                Generado con {insight.model} · solo
+                sobre los datos del sistema
+              </span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ExecutiveDashboard() {
   const [data, setData] =
     useState<DashboardResponse | null>(
@@ -623,6 +835,358 @@ export default function ExecutiveDashboard() {
       setTimeout(() => setCopiedInsight(null), 1800);
     } catch {}
   }
+
+  /*
+   * IA de módulos (Pulso, Cartera, Retención, Reactivación, Venta cruzada,
+   * Migración y CRM): mismo patrón que el Cliente 360° — motor elegible
+   * (algoritmo solo / dual / solo IA) y análisis server-side con DeepSeek.
+   */
+  const [modEngines, setModEngines] = useState<
+    Partial<Record<ModuleAiId, InsightMode>>
+  >({});
+
+  const [modInsights, setModInsights] = useState<
+    Record<
+      string,
+      {
+        status: "loading" | "error" | "done";
+        data?: ModuleInsight;
+        error?: string;
+      }
+    >
+  >({});
+
+  const [copiedMod, setCopiedMod] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved: Partial<
+        Record<ModuleAiId, InsightMode>
+      > = {};
+
+      MODULE_AI_IDS.forEach((module) => {
+        const value = localStorage.getItem(
+          `r360-engine-${module}`
+        );
+
+        if (
+          value === "algoritmo" ||
+          value === "dual" ||
+          value === "ia"
+        ) {
+          saved[module] = value;
+        }
+      });
+
+      if (Object.keys(saved).length > 0) {
+        setModEngines((prev) => ({
+          ...saved,
+          ...prev,
+        }));
+      }
+    } catch {}
+  }, []);
+
+  function chooseModEngine(
+    module: ModuleAiId,
+    mode: InsightMode
+  ) {
+    setModEngines((prev) => ({
+      ...prev,
+      [module]: mode,
+    }));
+
+    try {
+      localStorage.setItem(
+        `r360-engine-${module}`,
+        mode
+      );
+    } catch {}
+  }
+
+  function moduleContext(
+    module: ModuleAiId
+  ): Record<string, unknown> {
+    if (!data) {
+      return {};
+    }
+
+    switch (module) {
+      case "pulso":
+        return {
+          "Pólizas activas":
+            data.current.activePolicies,
+          "Prima activa ARS":
+            data.current.activePremium,
+          "Clientes con póliza activa":
+            data.current.activeClients,
+          "Vencen ≤7 días": data.current.expires7,
+          "Vencen ≤30 días":
+            data.current.expires30,
+          "Altas históricas": data.historic.altas,
+          "Anulaciones históricas":
+            data.historic.anulaciones,
+          "Crecimiento neto": data.historic.net,
+          "Siniestros históricos":
+            data.historic.siniestros,
+          Cotizaciones: data.historic.cotizaciones,
+          "Evolución mensual (últimos 6 meses)":
+            data.monthly.slice(-6).map(
+              (row) =>
+                `${row.month}: altas ${row.altas}, anulaciones ${row.anulaciones}, neto ${row.net}, siniestros ${row.siniestros}`
+            ),
+        };
+
+      case "cartera":
+        return {
+          "Pólizas cargadas":
+            data.current.loadedPolicies,
+          "Pólizas activas":
+            data.current.activePolicies,
+          "Prima activa ARS":
+            data.current.activePremium,
+          "Clientes con 1 póliza":
+            data.current.onePolicyClients,
+          "Clientes con 2 o más":
+            data.current.multiPolicyClients,
+          "Productos con más pólizas activas":
+            data.currentProducts
+              .slice(0, 6)
+              .map(
+                (row) =>
+                  `${row.name}: ${row.value}`
+              ),
+          "Compañías (pólizas y prima activa)":
+            data.companies
+              .slice(0, 6)
+              .map(
+                (row) =>
+                  `${row.name}: ${row.policies} pólizas, prima activa $${row.activePremium}`
+              ),
+          "Oficinas (altas / anulaciones / neto)":
+            data.offices
+              .slice(0, 6)
+              .map(
+                (row) =>
+                  `${row.name}: ${row.altas} / ${row.anulaciones} / ${row.net}`
+              ),
+        };
+
+      case "retencion":
+        return {
+          "Vencen ≤7 días": data.current.expires7,
+          "Vencen ≤30 días":
+            data.current.expires30,
+          "Pólizas activas":
+            data.current.activePolicies,
+          "Clientes a observar (activos con anulaciones históricas)":
+            data.opportunity.retentionWatch,
+          "Siniestros históricos":
+            data.historic.siniestros,
+          "Anulaciones históricas":
+            data.historic.anulaciones,
+        };
+
+      case "reactivacion":
+        return {
+          "Candidatos (histórico sin póliza activa)":
+            data.opportunity
+              .reactivationCandidates,
+          "Universo potencial (histórico sin póliza cargada)":
+            data.opportunity
+              .historicalWithoutCurrentPolicy,
+          "Altas históricas": data.historic.altas,
+          "Anulaciones históricas":
+            data.historic.anulaciones,
+          "Siniestros históricos":
+            data.historic.siniestros,
+        };
+
+      case "cross":
+        return {
+          "Clientes con 1 sola póliza activa":
+            data.opportunity.activeWithOnePolicy,
+          "Pólizas activas":
+            data.current.activePolicies,
+          "Oportunidades detectadas (clientes por combinación)":
+            data.crossSell
+              .slice(0, 8)
+              .map(
+                (row) =>
+                  `${row.opportunity}: ${row.customers} clientes`
+              ),
+        };
+
+      case "migracion":
+        return {
+          "Clientes en el sistema":
+            data.migration.clients,
+          "Gestiones históricas":
+            data.migration.historicOperations,
+          "Clientes vinculados":
+            data.migration.matchedClients,
+          "Gestiones vinculadas":
+            data.migration.matchedOperations,
+          "Tasa de vínculo de clientes %":
+            data.migration.clientMatchRate,
+          "Tasa de vínculo de gestiones %":
+            data.migration.operationMatchRate,
+          "Gestiones sin vincular":
+            data.migration.unmatchedOperations,
+          "Pólizas cargadas":
+            data.migration.loadedPolicies,
+          "Pólizas sin cliente":
+            data.migration.policiesWithoutClient,
+          "Pólizas sin producto":
+            data.migration.policiesWithoutProduct,
+          "Pólizas sin compañía":
+            data.migration.policiesWithoutCompany,
+          "Pólizas sin vencimiento":
+            data.migration.policiesWithoutExpiry,
+        };
+
+      case "crm":
+        return {
+          Nota: data.crm?.available
+            ? "Snapshot real del CRM Vocero"
+            : "Snapshot del CRM no disponible",
+          Contactos: data.crm?.kpis?.contacts,
+          Conversaciones:
+            data.crm?.kpis?.conversations,
+          "Conversaciones abiertas":
+            data.crm?.kpis?.openConversations,
+          Mensajes: data.crm?.kpis?.messages,
+          "Mensajes de la IA":
+            data.crm?.kpis?.ai,
+          Leads: data.crm?.kpis?.leads,
+          Convertidos: data.crm?.kpis?.converted,
+          "Tasa de conversión %":
+            data.crm?.kpis?.conversionRate,
+          "Monto de pipeline ARS":
+            data.crm?.kpis?.pipelineAmount,
+          "Contactos vinculados a cartera":
+            data.crm?.kpis?.matchedContacts,
+          "Tasa de vínculo %":
+            data.crm?.kpis?.matchRate,
+          "Prima vinculada ARS":
+            data.crm?.kpis?.matchedPremium,
+          "Etapas del pipeline (leads por etapa)":
+            data.crm?.pipeline
+              ?.slice(0, 6)
+              .map(
+                (row) =>
+                  `${row.name}: ${row.leads}`
+              ),
+        };
+
+      default:
+        return {};
+    }
+  }
+
+  const insightKeyFor = (
+    module: ModuleAiId,
+    mode: InsightMode
+  ) =>
+    `${module}:${
+      mode === "ia" ? "ia" : "dual"
+    }`;
+
+  async function requestModuleInsight(
+    module: ModuleAiId,
+    mode: "dual" | "ia"
+  ) {
+    const key = `${module}:${mode}`;
+
+    setModInsights((prev) => ({
+      ...prev,
+      [key]: { status: "loading" },
+    }));
+
+    try {
+      const response = await fetch(
+        "/api/module-insight",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            module,
+            mode,
+            context: moduleContext(module),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.error || "La IA no respondió."
+        );
+      }
+
+      setModInsights((prev) => ({
+        ...prev,
+        [key]: {
+          status: "done",
+          data: result.insight,
+        },
+      }));
+    } catch (err: any) {
+      setModInsights((prev) => ({
+        ...prev,
+        [key]: {
+          status: "error",
+          error:
+            err?.message || "La IA no respondió.",
+        },
+      }));
+    }
+  }
+
+  async function copyModuleMessage(
+    module: ModuleAiId,
+    text: string
+  ) {
+    try {
+      await navigator.clipboard.writeText(text);
+
+      setCopiedMod(module);
+
+      setTimeout(() => setCopiedMod(null), 1800);
+    } catch {}
+  }
+
+  const aiRow = (module: ModuleAiId) => {
+    const mode: InsightMode =
+      modEngines[module] || "dual";
+
+    return (
+      <ModuleAiRow
+        key={module}
+        id={module}
+        engine={mode}
+        onEngine={(next) =>
+          chooseModEngine(module, next)
+        }
+        state={
+          modInsights[insightKeyFor(module, mode)]
+        }
+        onGenerate={() =>
+          requestModuleInsight(
+            module,
+            mode === "ia" ? "ia" : "dual"
+          )
+        }
+        onCopy={(text) =>
+          copyModuleMessage(module, text)
+        }
+        copied={copiedMod === module}
+      />
+    );
+  };
 
   async function load(
     override?: typeof filters
@@ -1212,6 +1776,8 @@ export default function ExecutiveDashboard() {
               id="pulso"
               onAction={applyHelpAction}
             />
+
+            {aiRow("pulso")}
             <section className="kpi-grid">
               <Kpi
                 title="Clientes históricos"
@@ -1502,6 +2068,8 @@ export default function ExecutiveDashboard() {
               id="cartera"
               onAction={applyHelpAction}
             />
+
+            {aiRow("cartera")}
             <div className="notice warning-notice">
               <AlertTriangle
                 size={20}
@@ -1726,6 +2294,8 @@ export default function ExecutiveDashboard() {
               id="retencion"
               onAction={applyHelpAction}
             />
+
+            {aiRow("retencion")}
             <section className="kpi-grid">
               <Kpi
                 title="Vencen ≤7 días"
@@ -1805,6 +2375,8 @@ export default function ExecutiveDashboard() {
               id="reactivacion"
               onAction={applyHelpAction}
             />
+
+            {aiRow("reactivacion")}
             <section className="kpi-grid">
               <Kpi
                 title="Candidatos detectados"
@@ -1901,6 +2473,8 @@ export default function ExecutiveDashboard() {
               id="cross"
               onAction={applyHelpAction}
             />
+
+            {aiRow("cross")}
             <section className="kpi-grid">
               <Kpi
                 title="Una sola póliza"
@@ -2344,6 +2918,8 @@ export default function ExecutiveDashboard() {
               id="migracion"
               onAction={applyHelpAction}
             />
+
+            {aiRow("migracion")}
             <section className="kpi-grid">
               <Kpi
                 title="Clientes"
@@ -2491,6 +3067,9 @@ export default function ExecutiveDashboard() {
               id="crm"
               onAction={applyHelpAction}
             />
+
+            {data.crm?.available &&
+              aiRow("crm")}
             {!data.crm.available ? (
               <Section
                 title="CRM · Venta y gestión"
