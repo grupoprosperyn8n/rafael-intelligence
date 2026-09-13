@@ -1159,6 +1159,14 @@ export async function buildDashboard(
 
   let matchedOperations = 0;
 
+  /* Gestiones que quedaron vinculadas a un cliente del maestro: la
+   * lista "Gestiones con cliente vinculado" las muestra con su ficha. */
+  type RawHistoricRecord =
+    (typeof historicRecords)[number];
+
+  const matchedRawRecords: RawHistoricRecord[] =
+    [];
+
   historicRecords.forEach((record) => {
     const clientId =
       matchHistoricClient(record.fields);
@@ -1166,6 +1174,8 @@ export async function buildDashboard(
     if (!clientId) return;
 
     matchedOperations++;
+
+    matchedRawRecords.push(record);
 
     if (!clientHistory.has(clientId)) {
       clientHistory.set(clientId, {
@@ -1741,6 +1751,18 @@ export async function buildDashboard(
 
   const LIST_CAP = 100;
 
+  const descText = (
+    a?: string,
+    b?: string
+  ) => {
+    const left = a || "";
+    const right = b || "";
+
+    if (left === right) return 0;
+
+    return left < right ? 1 : -1;
+  };
+
   const lists: Record<string, DrillList[]> = {
     pulso: [],
     cartera: [],
@@ -1933,6 +1955,113 @@ export async function buildDashboard(
       }),
   });
 
+  /* Clientes con al menos una póliza activa (la tarjeta "Clientes
+   * activos cargados"): las fichas reales detrás del número. */
+  const activeClientEntries = [
+    ...clientActivePolicies.entries(),
+  ]
+    .slice()
+    .sort((a, b) => {
+      const premiumA = a[1].reduce(
+        (sum, policy) =>
+          sum + policy.activePremium,
+        0
+      );
+      const premiumB = b[1].reduce(
+        (sum, policy) =>
+          sum + policy.activePremium,
+        0
+      );
+
+      return premiumB - premiumA;
+    });
+
+  lists.cartera.push({
+    id: "clients",
+    title: "Clientes con póliza activa",
+    total: activeClientSet.size,
+    shown: Math.min(
+      activeClientEntries.length,
+      LIST_CAP
+    ),
+    items: activeClientEntries
+      .slice(0, LIST_CAP)
+      .map(([clientId, clientPolicies]) => {
+        const client =
+          listClientById.get(clientId);
+
+        const products = [
+          ...new Set(
+            clientPolicies
+              .map((policy) => policy.product)
+              .filter(Boolean)
+          ),
+        ];
+
+        return drillItem(
+          client?.name ||
+            "Cliente sin nombre",
+          `${clientPolicies.length} póliza(s) activa(s) · ${
+            products.slice(0, 3).join(", ") ||
+            "—"
+          }`,
+          `Prima activa ${clientPremiumText(
+            clientId
+          )}`,
+          backendLinksFor(clientId),
+          client?.dni
+        );
+      }),
+  });
+
+  /* Pólizas cargadas en el sistema nuevo, las más recientes primero
+   * (la lista de la tarjeta "Pólizas cargadas"). */
+  const loadedSorted = filteredPolicies
+    .slice()
+    .sort((a, b) =>
+      descText(a.createdTime, b.createdTime)
+    );
+
+  lists.cartera.push({
+    id: "loaded",
+    title: "Pólizas cargadas (más recientes)",
+    total: filteredPolicies.length,
+    shown: Math.min(
+      loadedSorted.length,
+      LIST_CAP
+    ),
+    items: loadedSorted
+      .slice(0, LIST_CAP)
+      .map((policy) => {
+        const clientId =
+          policy.clientIds[0];
+
+        return drillItem(
+          clientId
+            ? listClientById.get(clientId)
+                ?.name ||
+              "Cliente sin nombre"
+            : "Sin cliente vinculado",
+          `${
+            policy.product || "—"
+          } · Póliza ${policy.number || "s/n"}`,
+          `${
+            policy.company || "—"
+          } · ${
+            isActivePolicy(policy.statuses)
+              ? "Activa"
+              : "No vigente"
+          } · cargada ${dateText(
+            policy.createdTime
+          )}`,
+          policyLinksFor(
+            policy.id,
+            clientId
+          )
+        );
+      }),
+  });
+
   /*
    * RETENCION — vencimientos + clientes a observar.
    */
@@ -2107,6 +2236,57 @@ export async function buildDashboard(
       }),
   });
 
+  /* Universo mayor: historia comercial sin póliza activa cargada
+   * (la tarjeta "Históricos sin activa cargada" de Reactivación). */
+  const universeEntries = [
+    ...clientHistory.entries(),
+  ]
+    .filter(
+      ([clientId]) =>
+        clientActiveCount(clientId) === 0
+    )
+    .sort(
+      (a, b) =>
+        b[1].operations - a[1].operations
+    );
+
+  lists.reactivacion.push({
+    id: "universe",
+    title: "Históricos sin póliza activa",
+    total: historicalWithoutCurrentPolicy,
+    shown: Math.min(
+      universeEntries.length,
+      LIST_CAP
+    ),
+    items: universeEntries
+      .slice(0, LIST_CAP)
+      .map(([clientId, history]) => {
+        const client =
+          listClientById.get(clientId);
+
+        return drillItem(
+          client?.name ||
+            "Cliente sin nombre",
+          `${history.operations} gestiones · ${
+            history.altas
+          } altas${
+            history.anulaciones
+              ? ` · ${history.anulaciones} anulaciones`
+              : ""
+          }`,
+          `Productos: ${clientProductsText(
+            clientId
+          )}${
+            client?.phone
+              ? ` · Tel ${client.phone}`
+              : ""
+          }`,
+          backendLinksFor(clientId),
+          client?.dni
+        );
+      }),
+  });
+
   /*
    * VENTA CRUZADA — clientes por oportunidad.
    */
@@ -2139,6 +2319,67 @@ export async function buildDashboard(
       to: "ACCIDENTES PERSONALES",
     },
   ];
+
+  /* Clientes con una sola póliza activa: la oportunidad directa de
+   * cross-selling (la tarjeta "Una sola póliza"). */
+  const onePolicyEntries = [
+    ...clientActivePolicies.entries(),
+  ]
+    .filter(
+      ([, clientPolicies]) =>
+        clientPolicies.length === 1
+    )
+    .sort((a, b) => {
+      const premiumA = a[1].reduce(
+        (sum, policy) =>
+          sum + policy.activePremium,
+        0
+      );
+      const premiumB = b[1].reduce(
+        (sum, policy) =>
+          sum + policy.activePremium,
+        0
+      );
+
+      return premiumB - premiumA;
+    });
+
+  lists.cross.unshift({
+    id: "one",
+    title: "Clientes con una sola póliza",
+    total: onePolicyClients,
+    shown: Math.min(
+      onePolicyEntries.length,
+      LIST_CAP
+    ),
+    items: onePolicyEntries
+      .slice(0, LIST_CAP)
+      .map(([clientId, clientPolicies]) => {
+        const client =
+          listClientById.get(clientId);
+
+        const products = [
+          ...new Set(
+            clientPolicies
+              .map((policy) => policy.product)
+              .filter(Boolean)
+          ),
+        ];
+
+        return drillItem(
+          client?.name ||
+            "Cliente sin nombre",
+          `Tiene: ${
+            products.join(", ") || "—"
+          } · 1 póliza activa`,
+          `Prima activa ${clientPremiumText(
+            clientId
+          )}`,
+          backendLinksFor(clientId),
+          client?.dni
+        );
+      }),
+  });
 
   crossRules
     .filter(
@@ -2347,6 +2588,186 @@ export async function buildDashboard(
         );
       }),
   });
+
+  /* El "por dentro" de la migración: últimas gestiones, gestiones con
+   * cliente vinculado, clientes macheados y clientes cargados. */
+  const historicDate = (
+    record: RawHistoricRecord
+  ) =>
+    text(
+      record.fields[historicConfig.fields.date]
+    );
+
+  const historicDrill = (
+    record: RawHistoricRecord
+  ) => {
+    const fields = record.fields;
+    const clientId =
+      matchHistoricClient(fields);
+
+    const employeeId = firstLinked(
+      fields[historicConfig.fields.employee]
+    );
+
+    const employee = employeeId
+      ? historicEmployeeNames.get(
+          employeeId
+        ) ||
+        employeeNames.get(employeeId) ||
+        ""
+      : "";
+
+    return drillItem(
+      text(
+        fields[historicConfig.fields.name]
+      ) || "Sin nombre",
+      `${
+        text(
+          fields[
+            historicConfig.fields.reason
+          ]
+        ) || "—"
+      } · ${
+        text(
+          fields[
+            historicConfig.fields.product
+          ]
+        ) || "—"
+      }`,
+      `${dateText(
+        historicDate(record)
+      )} · ${
+        text(
+          fields[
+            historicConfig.fields.office
+          ]
+        ) || "—"
+      }${employee ? ` · ${employee}` : ""}`,
+      backendLinksFor(clientId)
+    );
+  };
+
+  const historicSorted = (
+    source: RawHistoricRecord[]
+  ) =>
+    source
+      .map((record) => ({
+        record,
+        date: historicDate(record),
+      }))
+      .sort((a, b) =>
+        descText(a.date, b.date)
+      )
+      .slice(0, LIST_CAP)
+      .map((pair) =>
+        historicDrill(pair.record)
+      );
+
+  lists.migracion.push({
+    id: "recent",
+    title: "Últimas gestiones (todas)",
+    total: historicRecords.length,
+    shown: Math.min(
+      historicRecords.length,
+      LIST_CAP
+    ),
+    items: historicSorted(historicRecords),
+  });
+
+  lists.migracion.push({
+    id: "matchedops",
+    title: "Gestiones con cliente vinculado",
+    total: matchedOperations,
+    shown: Math.min(
+      matchedRawRecords.length,
+      LIST_CAP
+    ),
+    items: historicSorted(matchedRawRecords),
+  });
+
+  /* Clientes macheados: aparecen en la historia y en el maestro. */
+  const matchedClientEntries = [
+    ...clientHistory.entries(),
+  ].sort(
+    (a, b) =>
+      b[1].operations - a[1].operations
+  );
+
+  lists.migracion.push({
+    id: "matched",
+    title: "Clientes macheados",
+    total: matchedClients,
+    shown: Math.min(
+      matchedClientEntries.length,
+      LIST_CAP
+    ),
+    items: matchedClientEntries
+      .slice(0, LIST_CAP)
+      .map(([clientId, history]) => {
+        const client =
+          listClientById.get(clientId);
+
+        return drillItem(
+          client?.name ||
+            "Cliente sin nombre",
+          `${history.operations} gestiones · ${
+            history.altas
+          } altas${
+            history.anulaciones
+              ? ` · ${history.anulaciones} anulaciones`
+              : ""
+          }`,
+          `Productos: ${clientProductsText(
+            clientId
+          )}${
+            client?.phone
+              ? ` · Tel ${client.phone}`
+              : ""
+          }`,
+          backendLinksFor(clientId),
+          client?.dni
+        );
+      }),
+  });
+
+  /* Clientes cargados en el maestro, los más recientes primero (se
+   * muestra también en Pulso como "Clientes históricos"). */
+  const clientsSorted = clients
+    .slice()
+    .sort((a, b) =>
+      descText(a.createdTime, b.createdTime)
+    );
+
+  const clientsDrill: DrillList = {
+    id: "clients",
+    title: "Clientes cargados (últimas 100)",
+    total: clients.length,
+    shown: Math.min(
+      clientsSorted.length,
+      LIST_CAP
+    ),
+    items: clientsSorted
+      .slice(0, LIST_CAP)
+      .map((client) =>
+        drillItem(
+          client.name ||
+            "Cliente sin nombre",
+          `${
+            client.phone
+              ? `Tel ${client.phone}`
+              : "—"
+          }`,
+          `Cargado ${dateText(
+            client.createdTime
+          )}`,
+          backendLinksFor(client.id),
+          client.dni
+        )
+      ),
+  };
+
+  lists.migracion.push(clientsDrill);
+  lists.pulso.push(clientsDrill);
 
   /*
    * CRM — contactos vinculados a la cartera.

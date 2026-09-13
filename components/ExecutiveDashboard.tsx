@@ -129,7 +129,7 @@ function Kpi({
       role={onClick ? "button" : undefined}
       title={
         onClick
-          ? "Ver la lista de clientes detrás de este número"
+          ? "Ver la lista de registros detrás de este número"
           : undefined
       }
     >
@@ -2186,6 +2186,9 @@ export default function ExecutiveDashboard() {
                   data.migration.clients
                 )}
                 subtitle="Base maestra actual"
+                onClick={() =>
+                  openList("pulso", "clients")
+                }
                 icon={
                   <Users size={20} />
                 }
@@ -2228,6 +2231,9 @@ export default function ExecutiveDashboard() {
                     .loadedPolicies
                 )}
                 subtitle="Activas + no vigentes — cualquier estado"
+                onClick={() =>
+                  gotoList("cartera", "loaded")
+                }
                 icon={
                   <ShieldCheck
                     size={20}
@@ -2243,6 +2249,9 @@ export default function ExecutiveDashboard() {
                     .activePremium
                 )}
                 subtitle="No representa aún la cartera total"
+                onClick={() =>
+                  gotoList("cartera", "active")
+                }
                 icon={
                   <CircleDollarSign
                     size={20}
@@ -2516,6 +2525,9 @@ export default function ExecutiveDashboard() {
                     data.current
                       .activePolicies
                 )}`}
+                onClick={() =>
+                  openList("cartera", "loaded")
+                }
                 icon={
                   <BriefcaseBusiness />
                 }
@@ -2543,6 +2555,9 @@ export default function ExecutiveDashboard() {
                     .activeClients
                 )}
                 subtitle="Con al menos una póliza activa"
+                onClick={() =>
+                  openList("cartera", "clients")
+                }
                 icon={<Users />}
               />
 
@@ -2553,6 +2568,9 @@ export default function ExecutiveDashboard() {
                     .activePremium
                 )}
                 subtitle="Valor parcial"
+                onClick={() =>
+                  openList("cartera", "active")
+                }
                 icon={
                   <CircleDollarSign />
                 }
@@ -2845,6 +2863,12 @@ export default function ExecutiveDashboard() {
                     .historicalWithoutCurrentPolicy
                 )}
                 subtitle="Universo potencial"
+                onClick={() =>
+                  openList(
+                    "reactivacion",
+                    "universe"
+                  )
+                }
                 icon={<Users />}
               />
             </section>
@@ -2934,6 +2958,9 @@ export default function ExecutiveDashboard() {
                     .onePolicyClients
                 )}
                 subtitle="Oportunidad directa de cross-selling"
+                onClick={() =>
+                  openList("cross", "one")
+                }
                 icon={
                   <ArrowUpRight />
                 }
@@ -3431,6 +3458,9 @@ export default function ExecutiveDashboard() {
                   data.migration.clients
                 )}
                 subtitle="Maestro Agentico"
+                onClick={() =>
+                  openList("migracion", "clients")
+                }
                 icon={<Users />}
               />
 
@@ -3441,6 +3471,12 @@ export default function ExecutiveDashboard() {
                     .historicOperations
                 )}
                 subtitle="Base Rafael"
+                onClick={() =>
+                  openList(
+                    "migracion",
+                    "recent"
+                  )
+                }
                 icon={<Database />}
               />
 
@@ -3454,6 +3490,12 @@ export default function ExecutiveDashboard() {
                   data.migration
                     .clientMatchRate
                 )}
+                onClick={() =>
+                  openList(
+                    "migracion",
+                    "matched"
+                  )
+                }
                 icon={
                   <UserRoundCheck />
                 }
@@ -3470,6 +3512,12 @@ export default function ExecutiveDashboard() {
                   data.migration
                     .operationMatchRate
                 )}
+                onClick={() =>
+                  openList(
+                    "migracion",
+                    "matchedops"
+                  )
+                }
                 icon={
                   <ShieldCheck />
                 }
@@ -3658,6 +3706,9 @@ export default function ExecutiveDashboard() {
                         ? "abierta"
                         : "abiertas"
                     }`}
+                    onClick={() =>
+                      openList("crm", "matched")
+                    }
                     icon={<Users />}
                   />
 
