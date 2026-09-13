@@ -10,6 +10,7 @@ if (!TOKEN) {
 
 type CacheEntry = {
   expires: number;
+  fetchedAt: number;
   records: AirtableRecord[];
 };
 
@@ -48,10 +49,32 @@ function cacheMinutes() {
  *    de red, respetando el header Retry-After.
  *  - Dedupe de lecturas en vuelo: si dos rebuilds piden la misma tabla
  *    a la vez, comparten la MISMA descarga (jamás dos scans paralelos).
+ *  - Stale-while-revalidate: si la copia venció (pero no es demasiado
+ *    vieja) se sirve AL INSTANTE y se refresca en segundo plano: los
+ *    usuarios nunca esperan un rebuild. El warm cron (cada 5 min,
+ *    ?refresh=1) mantiene los datos al día.
  */
 
 const MIN_INTERVAL_MS = Number(
   process.env.AIRTABLE_MIN_INTERVAL_MS || 250
+);
+
+/*
+ * Anti-amplificación del refresco forzado: si una tabla se descargó
+ * hace menos que esto, un ?refresh=1 no la vuelve a bajar.
+ */
+const FORCE_MIN_INTERVAL_MS = Number(
+  process.env.AIRTABLE_FORCE_MIN_INTERVAL_MS ||
+    120000
+);
+
+/*
+ * Tope de la copia "vieja": pasado esto desde el vencimiento, ya no
+ * se sirve stale (se intenta la descarga y, si falla, el error sube).
+ */
+const STALE_MAX_MS = Number(
+  process.env.AIRTABLE_STALE_MAX_MS ||
+    2 * 60 * 60 * 1000
 );
 
 const MAX_ATTEMPTS = 6;
@@ -161,13 +184,31 @@ async function fetchPage(
 export async function airtableTable(
   baseId: string,
   tableName: string,
-  fields?: string[]
+  fields?: string[],
+  options?: { force?: boolean }
 ): Promise<AirtableRecord[]> {
   const cacheKey = `${baseId}:${tableName}:${fields?.join(",") || "*"}`;
 
+  const now = Date.now();
+  const force = options?.force === true;
+
   const cached = cache.get(cacheKey);
 
-  if (cached && cached.expires > Date.now()) {
+  const fresh = !!(
+    cached && cached.expires > now
+  );
+
+  if (cached && fresh && !force) {
+    return cached.records;
+  }
+
+  if (
+    cached &&
+    fresh &&
+    force &&
+    now - cached.fetchedAt <
+      FORCE_MIN_INTERVAL_MS
+  ) {
     return cached.records;
   }
 
@@ -183,7 +224,22 @@ export async function airtableTable(
 
   const inFlight = pending.get(cacheKey);
 
+  const canServeStale = !!(
+    cached &&
+    !force &&
+    now - cached.expires < STALE_MAX_MS
+  );
+
   if (inFlight) {
+    /*
+     * Si hay una descarga en curso pero podemos servir la copia
+     * vieja, no hacemos esperar a nadie: al toque, y el refresh
+     * sigue de fondo.
+     */
+    if (canServeStale) {
+      return cached!.records;
+    }
+
     return inFlight;
   }
 
@@ -229,10 +285,13 @@ export async function airtableTable(
       offset = data.offset;
     } while (offset);
 
+    const fetchedAt = Date.now();
+
     cache.set(cacheKey, {
       records,
+      fetchedAt,
       expires:
-        Date.now() +
+        fetchedAt +
         cacheMinutes() * 60 * 1000,
     });
 
@@ -241,10 +300,34 @@ export async function airtableTable(
 
   pending.set(cacheKey, load);
 
+  const clearPending = () => {
+    if (pending.get(cacheKey) === load) {
+      pending.delete(cacheKey);
+    }
+  };
+
+  /*
+   * Stale-while-revalidate: hay copia vencida (no demasiado vieja)
+   * ⇒ se sirve ya mismo y el refresco sigue en segundo plano.
+   */
+  if (canServeStale) {
+    load
+      .catch((error: any) => {
+        console.warn(
+          `Refresco de ${tableName} en segundo plano falló: ${
+            error?.message || error
+          }`
+        );
+      })
+      .finally(clearPending);
+
+    return cached!.records;
+  }
+
   try {
     return await load;
   } finally {
-    pending.delete(cacheKey);
+    clearPending();
   }
 }
 

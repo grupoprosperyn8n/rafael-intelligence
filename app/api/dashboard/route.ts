@@ -44,6 +44,9 @@ export async function GET(
         search:
           params.get("search") ||
           undefined,
+
+        refresh:
+          params.get("refresh") === "1",
       });
 
     return NextResponse.json(

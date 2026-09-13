@@ -13,6 +13,12 @@ export type DashboardFilters = {
   channel?: string;
   company?: string;
   search?: string;
+
+  /*
+   * Interno: fuerza un refresco de la caché de datos (lo usa el
+   * warm cron con ?refresh=1). No es un filtro de UI.
+   */
+  refresh?: boolean;
 };
 
 export type HistoricCompact = {

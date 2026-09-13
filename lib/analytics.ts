@@ -299,7 +299,15 @@ export async function buildDashboard(
   const agenticConfig = CONFIG.agentic;
 
   /*
-   * 1. CARGAMOS TABLAS AUXILIARES DE LA BASE NUEVA
+   * Refresco forzado (lo usa el warm cron con ?refresh=1): baja
+   * todas las tablas de nuevo, ignorando la caché vigente.
+   */
+  const force = filters.refresh === true;
+
+  /*
+   * 1. CARGAMOS TABLAS AUXILIARES (y la GESTIÓN histórica viene acá
+   *    TAMBIÉN, para bajarla EN PARALELO con el resto: el arranque en
+   *    frío baja de ~2,2 min a ~1,5 min y el warm cada 5 min holga).
    */
 
   const [
@@ -310,39 +318,48 @@ export async function buildDashboard(
     rawEmployees,
     rawOffices,
     rawHistoricEmployees,
+    rawHistoricRecords,
   ] = await Promise.all([
     airtableTable(
       agenticConfig.baseId,
       agenticConfig.tables.clients,
-      Object.values(agenticConfig.clientFields)
+      Object.values(agenticConfig.clientFields),
+      { force }
     ),
 
     airtableTable(
       agenticConfig.baseId,
       agenticConfig.tables.policies,
-      Object.values(agenticConfig.policyFields)
+      Object.values(agenticConfig.policyFields),
+      { force }
     ),
 
     airtableTable(
       agenticConfig.baseId,
       agenticConfig.tables.products,
-      Object.values(agenticConfig.productFields)
+      Object.values(agenticConfig.productFields),
+      { force }
     ),
 
     airtableTable(
       agenticConfig.baseId,
       agenticConfig.tables.companies,
-      Object.values(agenticConfig.companyFields)
+      Object.values(agenticConfig.companyFields),
+      { force }
     ),
 
     airtableTable(
       agenticConfig.baseId,
-      agenticConfig.tables.employees
+      agenticConfig.tables.employees,
+      undefined,
+      { force }
     ),
 
     airtableTable(
       agenticConfig.baseId,
-      agenticConfig.tables.offices
+      agenticConfig.tables.offices,
+      undefined,
+      { force }
     ),
 
     // ATENDIDO X del histórico es un linked record a "👥 EMPLEADOS"
@@ -350,7 +367,17 @@ export async function buildDashboard(
     airtableTable(
       historicConfig.baseId,
       historicConfig.tables.employees,
-      [historicConfig.employeeNameField]
+      [historicConfig.employeeNameField],
+      { force }
+    ),
+
+    // 📊 GESTIÓN GENERAL (≈35k filas, la tabla más pesada de todas:
+    // en paralelo con las demás para acortar el arranque en frío).
+    airtableTable(
+      historicConfig.baseId,
+      historicConfig.tables.management,
+      Object.values(historicConfig.fields),
+      { force }
     ),
   ]);
 
@@ -632,12 +659,7 @@ export async function buildDashboard(
    * 5. HISTORIAL RAFAEL
    */
 
-  const historicRecords =
-    await airtableTable(
-      historicConfig.baseId,
-      historicConfig.tables.management,
-      Object.values(historicConfig.fields)
-    );
+  const historicRecords = rawHistoricRecords;
 
   function matchHistoricClient(
     fields: Record<string, any>
