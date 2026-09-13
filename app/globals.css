@@ -1698,22 +1698,22 @@ footer {
 
 .kpi-card.clickable:hover {
   transform: translateY(-2px);
-  border-color: rgba(125, 211, 252, 0.55);
-  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.5);
+  border-color: rgba(13, 91, 255, 0.45);
+  box-shadow: var(--shadow);
 }
 
 .kpi-more {
   margin-top: 6px;
   font-size: 11.5px;
   font-weight: 700;
-  color: #7dd3fc;
+  color: var(--primary);
   letter-spacing: 0.2px;
 }
 
 .mod-lists {
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
   overflow: hidden;
 }
 
@@ -1725,7 +1725,7 @@ footer {
   padding: 11px 16px;
   border: 0;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1733,18 +1733,22 @@ footer {
 }
 
 .mod-lists-toggle:hover {
-  background: rgba(148, 163, 184, 0.08);
+  background: var(--surface-2);
+}
+
+.mod-lists-toggle[aria-expanded="true"] {
+  background: var(--primary-soft);
 }
 
 .mod-lists-count {
   margin-left: auto;
   font-size: 12px;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--muted);
 }
 
 .mod-lists-chevron {
-  color: #94a3b8;
+  color: var(--muted);
   transition: transform 0.18s ease;
 }
 
@@ -1757,7 +1761,7 @@ footer {
   flex-direction: column;
   gap: 12px;
   padding: 12px 16px 16px;
-  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  border-top: 1px solid var(--border);
 }
 
 .mod-lists-tabs {
@@ -1772,23 +1776,24 @@ footer {
   gap: 8px;
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(15, 23, 42, 0.5);
-  color: #cbd5e1;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
   font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .mod-list-tab b {
-  color: #7dd3fc;
+  color: var(--primary);
   font-size: 11.5px;
   font-weight: 700;
 }
 
 .mod-list-tab.active {
-  border-color: rgba(56, 189, 248, 0.6);
-  background: rgba(56, 189, 248, 0.12);
-  color: #f8fafc;
+  border-color: rgba(13, 91, 255, 0.5);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .mod-lists-tools {
@@ -1802,15 +1807,15 @@ footer {
   min-width: 0;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(2, 6, 23, 0.6);
-  color: #e2e8f0;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
   font-size: 13px;
 }
 
 .mod-lists-print {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -1818,7 +1823,7 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 420px;
+  max-height: 380px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1828,10 +1833,16 @@ footer {
   grid-template-columns: minmax(180px, 1.05fr) 1.6fr auto;
   gap: 12px;
   align-items: center;
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  background: rgba(15, 23, 42, 0.45);
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mod-list-row:last-child {
+  border-bottom: 0;
+}
+
+.mod-list-row:hover {
+  background: var(--surface-2);
 }
 
 .mod-list-main {
@@ -1843,14 +1854,14 @@ footer {
 
 .mod-list-main strong {
   overflow: hidden;
-  color: #f1f5f9;
+  color: var(--text);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .mod-list-dni {
-  color: #94a3b8;
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -1859,12 +1870,12 @@ footer {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  color: #cbd5e1;
+  color: var(--muted);
   font-size: 12.5px;
 }
 
 .mod-list-extra {
-  color: #94a3b8;
+  color: var(--muted);
   font-size: 11.5px;
 }
 
@@ -1881,8 +1892,8 @@ footer {
   gap: 4px;
   padding: 5px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  color: #7dd3fc;
+  border: 1px solid rgba(13, 91, 255, 0.45);
+  color: var(--primary);
   font-size: 11.5px;
   font-weight: 600;
   text-decoration: none;
@@ -1890,13 +1901,13 @@ footer {
 }
 
 .mod-list-link:hover {
-  background: rgba(125, 211, 252, 0.12);
+  background: var(--primary-soft);
 }
 
 .mod-list-empty {
   padding: 18px;
   text-align: center;
-  color: #94a3b8;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1928,7 +1939,7 @@ footer {
 .opportunity-row.clickable:hover {
   border-color: var(--primary);
 
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--primary-soft);
 }
 
 .row-go {
@@ -1952,5 +1963,59 @@ footer {
 .quality-grid div.clickable:hover {
   border-color: var(--primary);
 
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--primary-soft);
+}
+
+/* Boton Cerrar de las listas (cierre completo con vuelta al lugar) */
+
+.mod-lists-close {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  padding: 6px 12px;
+
+  border-radius: 999px;
+
+  border: 1px solid var(--border);
+
+  background: var(--surface);
+
+  color: var(--text);
+
+  font-size: 12.5px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+}
+
+.mod-lists-close:hover {
+  border-color: rgba(13, 91, 255, 0.5);
+
+  background: var(--primary-soft);
+
+  color: var(--primary);
+}
+
+/* Auto-aplicado de filtros: indicador y contador de clientes */
+
+.filter-updating {
+  font-size: 12.5px;
+
+  font-weight: 600;
+
+  color: var(--primary);
+}
+
+.customer-count {
+  margin: 2px 0 10px;
+
+  color: var(--muted);
+
+  font-size: 12.5px;
 }

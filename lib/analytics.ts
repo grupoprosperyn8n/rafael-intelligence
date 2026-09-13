@@ -1278,6 +1278,11 @@ export async function buildDashboard(
       });
   }
 
+  const customerStats = {
+    total: clients.length,
+    matched: selectedClients.length,
+  };
+
   selectedClients =
     selectedClients.slice(0, 50);
 
@@ -2417,6 +2422,8 @@ export async function buildDashboard(
     },
 
     customers: customer360,
+
+    customerStats,
 
     crm,
 

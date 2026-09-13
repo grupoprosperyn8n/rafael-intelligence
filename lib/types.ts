@@ -185,6 +185,11 @@ export type DashboardResponse = {
     backendUrl: string;
   }[];
 
+  customerStats?: {
+    total: number;
+    matched: number;
+  };
+
   crm: CrmAnalytics;
 
   /*

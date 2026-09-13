@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -529,6 +530,7 @@ function ModuleLists({
   active,
   onToggle,
   onSelect,
+  onClose,
 }: {
   module: string;
   lists: DrillList[];
@@ -536,6 +538,7 @@ function ModuleLists({
   active: string;
   onToggle: () => void;
   onSelect: (id: string) => void;
+  onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
 
@@ -583,7 +586,9 @@ function ModuleLists({
         <ListTree size={15} />
 
         <span className="mod-lists-label">
-          Listas del módulo
+          {open
+            ? "Cerrar listas"
+            : "Listas del módulo"}
         </span>
 
         <span className="mod-lists-count">
@@ -642,6 +647,16 @@ function ModuleLists({
                 ? " · primeros registros"
                 : ""}
             </span>
+
+            <button
+              type="button"
+              className="mod-lists-close"
+              onClick={onClose}
+              title="Cerrar y volver a donde estabas"
+            >
+              <X size={14} />
+              Cerrar
+            </button>
           </div>
 
           <div className="mod-lists-table">
@@ -932,6 +947,12 @@ export default function ExecutiveDashboard() {
       company: "",
       search: "",
     });
+
+  // Timer para la auto-busqueda del Cliente 360°.
+  const searchTimer =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null
+    );
 
   /*
    * Motor de sugerencias del Cliente 360°: "algoritmo" | "dual" | "ia".
@@ -1418,27 +1439,65 @@ export default function ExecutiveDashboard() {
     Record<string, string>
   >({});
 
+  /*
+   * Al abrir una lista se guarda DONDE estaba el usuario (modulo y
+   * scroll). Al cerrarla, la pagina vuelve exactamente ahi.
+   */
+  const [listRestore, setListRestore] = useState<{
+    tab: Tab;
+    scrollY: number;
+  } | null>(null);
+
   const openList = (
     module: string,
     listId: string
   ) => {
+    setListRestore(
+      (prev) =>
+        prev || {
+          tab: tab,
+          scrollY: window.scrollY,
+        }
+    );
+
     setListSel((prev) => ({
       ...prev,
       [module]: listId,
     }));
 
-    setListOpen((prev) => ({
-      ...prev,
-      [module]: true,
-    }));
+    // Una sola lista abierta a la vez.
+    setListOpen({ [module]: true });
 
     setTimeout(() => {
       document
         .getElementById(`lists-${module}`)
         ?.scrollIntoView({
-          behavior: "smooth",
+          behavior: "auto",
           block: "start",
         });
+    }, 80);
+  };
+
+  /*
+   * Cierre completo: oculta la lista y devuelve la pagina al modulo
+   * y la posicion donde estaba el usuario antes de abrirla.
+   */
+  const closeList = () => {
+    setListOpen({});
+
+    const restore = listRestore;
+
+    if (!restore) return;
+
+    setListRestore(null);
+
+    setTab(restore.tab);
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: restore.scrollY,
+        behavior: "auto",
+      });
     }, 80);
   };
 
@@ -1472,12 +1531,16 @@ export default function ExecutiveDashboard() {
         active={
           listSel[module] || moduleLists[0].id
         }
-        onToggle={() =>
-          setListOpen((prev) => ({
-            ...prev,
-            [module]: !prev[module],
-          }))
-        }
+        onToggle={() => {
+          if (listOpen[module]) {
+            closeList();
+          } else {
+            openList(
+              module,
+              listSel[module] || moduleLists[0].id
+            );
+          }
+        }}
         onSelect={(id) => {
           setListSel((prev) => ({
             ...prev,
@@ -1489,6 +1552,7 @@ export default function ExecutiveDashboard() {
             [module]: true,
           }));
         }}
+        onClose={() => closeList()}
       />
     );
   };
@@ -1888,34 +1952,43 @@ export default function ExecutiveDashboard() {
           <input
             type="date"
             value={filters.from}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 from: e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           />
 
           <input
             type="date"
             value={filters.to}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 to: e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           />
 
           <select
             value={filters.office}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 office:
                   e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           >
             <option value="">
               Todas las oficinas
@@ -1935,13 +2008,16 @@ export default function ExecutiveDashboard() {
 
           <select
             value={filters.product}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 product:
                   e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           >
             <option value="">
               Todos los productos
@@ -1961,13 +2037,16 @@ export default function ExecutiveDashboard() {
 
           <select
             value={filters.channel}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 channel:
                   e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           >
             <option value="">
               Todos los canales
@@ -1987,13 +2066,16 @@ export default function ExecutiveDashboard() {
 
           <select
             value={filters.employee}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 employee:
                   e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           >
             <option value="">
               Todos los empleados
@@ -2013,13 +2095,16 @@ export default function ExecutiveDashboard() {
 
           <select
             value={filters.company}
-            onChange={(e) =>
-              setFilters({
+            onChange={(e) => {
+              const next = {
                 ...filters,
                 company:
                   e.target.value,
-              })
-            }
+              };
+
+              setFilters(next);
+              load(next);
+            }}
           >
             <option value="">
               Todas las compañías
@@ -2043,6 +2128,12 @@ export default function ExecutiveDashboard() {
           >
             Aplicar filtros
           </button>
+
+          {loading && data && (
+            <span className="filter-updating">
+              Actualizando datos…
+            </span>
+          )}
 
           {activeFilterChips.length > 0 && (
             <div className="filter-active">
@@ -2926,13 +3017,30 @@ export default function ExecutiveDashboard() {
                     filters.search
                   }
                   placeholder="Ej. Juan Pérez, DNI o teléfono"
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const value =
+                      e.target.value;
+
                     setFilters({
                       ...filters,
-                      search:
-                        e.target.value,
-                    })
-                  }
+                      search: value,
+                    });
+
+                    if (searchTimer.current) {
+                      clearTimeout(
+                        searchTimer.current
+                      );
+                    }
+
+                    // Auto-busqueda: 700ms desde la ultima tecla.
+                    searchTimer.current =
+                      setTimeout(() => {
+                        load({
+                          ...filters,
+                          search: value,
+                        });
+                      }, 700);
+                  }}
                   onKeyDown={(e) => {
                     if (
                       e.key === "Enter"
@@ -2999,6 +3107,20 @@ export default function ExecutiveDashboard() {
                   "La IA analiza el contexto real del cliente y propone la mejor acción."}
               </span>
             </div>
+
+            <p className="customer-count">
+              {filters.search
+                ? data.customers.length === 0
+                  ? "Sin resultados. Probá con otro nombre, DNI o teléfono."
+                  : data.customerStats &&
+                    data.customerStats.matched >
+                      data.customers.length
+                    ? `Mostrando los primeros ${data.customers.length} de ${data.customerStats.matched} resultados. Afiná la búsqueda para ver menos.`
+                    : `${data.customers.length} resultado${data.customers.length === 1 ? "" : "s"}.`
+                : data.customerStats
+                  ? `Mostrando ${data.customers.length} de ${data.customerStats.total} clientes cargados. Buscá por nombre, DNI o teléfono para ir directo a una ficha.`
+                  : ""}
+            </p>
 
             <div className="customer-grid">
               {data.customers.map(
