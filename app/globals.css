@@ -1910,3 +1910,47 @@ footer {
     justify-content: flex-start;
   }
 }
+
+/* Dinámico total: filas y celdas clickeables que abren su lista */
+
+.opportunity-row.clickable {
+  cursor: pointer;
+
+  align-items: center;
+
+  gap: 12px;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.opportunity-row.clickable:hover {
+  border-color: var(--primary);
+
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.row-go {
+  color: var(--primary);
+
+  font-size: 0.82rem;
+
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+.quality-grid div.clickable {
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.quality-grid div.clickable:hover {
+  border-color: var(--primary);
+
+  background: rgba(255, 255, 255, 0.05);
+}

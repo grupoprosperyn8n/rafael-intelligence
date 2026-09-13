@@ -404,13 +404,16 @@ function HelpZone({
 function SuggestionsStrip({
   data,
   onGoto,
+  onOpenList,
 }: {
   data: DashboardResponse;
   onGoto: (tab: Tab) => void;
+  onOpenList: (tab: Tab, listId: string) => void;
 }) {
   const items: {
     text: string;
     tab: Tab;
+    list?: string;
   }[] = [];
 
   if (data.current.expires7 > 0) {
@@ -419,6 +422,7 @@ function SuggestionsStrip({
         data.current.expires7
       )} pólizas vencen en ≤7 días — hablá hoy`,
       tab: "retencion",
+      list: "expires7",
     });
   } else if (data.current.expires30 > 0) {
     items.push({
@@ -426,6 +430,7 @@ function SuggestionsStrip({
         data.current.expires30
       )} pólizas vencen este mes — prepará la ronda`,
       tab: "retencion",
+      list: "expires30",
     });
   }
 
@@ -439,6 +444,7 @@ function SuggestionsStrip({
           .reactivationCandidates
       )} clientes para reactivar`,
       tab: "reactivacion",
+      list: "candidates",
     });
   }
 
@@ -453,6 +459,9 @@ function SuggestionsStrip({
         topCross.customers
       )} clientes para ampliar`,
       tab: "cross",
+      list: topCross.opportunity
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-"),
     });
   }
 
@@ -493,7 +502,11 @@ function SuggestionsStrip({
           <button
             key={item.text}
             className="sug-chip"
-            onClick={() => onGoto(item.tab)}
+            onClick={() =>
+              item.list
+                ? onOpenList(item.tab, item.list)
+                : onGoto(item.tab)
+            }
           >
             {item.text}
           </button>
@@ -1429,6 +1442,18 @@ export default function ExecutiveDashboard() {
     }, 80);
   };
 
+  /*
+   * gotoList: cambia de modulo y abre la lista pedida. Para numeros
+   * accionables cuya lista vive en otro modulo (tab distinto).
+   */
+  const gotoList = (
+    module: string,
+    listId: string
+  ) => {
+    setTab(module as Tab);
+    openList(module, listId);
+  };
+
   const listsRow = (module: string) => {
     const moduleLists =
       (data && data.lists && data.lists[module]) ||
@@ -1821,6 +1846,10 @@ export default function ExecutiveDashboard() {
               behavior: "smooth",
             });
           }}
+          onOpenList={(nextTab, listId) => {
+            setTab(nextTab);
+            openList(nextTab, listId);
+          }}
         />
 
         <section className="filter-panel">
@@ -2078,6 +2107,9 @@ export default function ExecutiveDashboard() {
                   data.historic.altas
                 )}
                 subtitle="Historia comercial"
+                onClick={() =>
+                  openList("pulso", "altas")
+                }
                 icon={
                   <UserRoundCheck
                     size={20}
@@ -2397,6 +2429,9 @@ export default function ExecutiveDashboard() {
                     .activePolicies
                 )}
                 subtitle="Según estado actual"
+                onClick={() =>
+                  openList("cartera", "active")
+                }
                 icon={
                   <ShieldCheck />
                 }
@@ -2640,6 +2675,9 @@ export default function ExecutiveDashboard() {
                     .siniestros
                 )}
                 subtitle="Clave para medir experiencia"
+                onClick={() =>
+                  gotoList("pulso", "siniestros")
+                }
                 icon={<Activity />}
               />
             </section>
@@ -2809,6 +2847,9 @@ export default function ExecutiveDashboard() {
                     .multiPolicyClients
                 )}
                 subtitle="Clientes más vinculados"
+                onClick={() =>
+                  gotoList("cartera", "multi")
+                }
                 icon={
                   <HeartHandshake />
                 }
@@ -2824,9 +2865,22 @@ export default function ExecutiveDashboard() {
                 {data.crossSell.map(
                   (item) => (
                     <div
-                      className="opportunity-row"
+                      className="opportunity-row clickable"
                       key={
                         item.opportunity
+                      }
+                      role="button"
+                      title="Ver los clientes de esta combinación"
+                      onClick={() =>
+                        openList(
+                          "cross",
+                          item.opportunity
+                            .toLowerCase()
+                            .replace(
+                              /[^a-z0-9]+/g,
+                              "-"
+                            )
+                        )
                       }
                     >
                       <strong>
@@ -2841,6 +2895,10 @@ export default function ExecutiveDashboard() {
                         )}{" "}
                         clientes
                       </div>
+
+                      <span className="row-go">
+                        Ver clientes →
+                      </span>
                     </div>
                   )
                 )}
@@ -3307,7 +3365,17 @@ export default function ExecutiveDashboard() {
                   </strong>
                 </div>
 
-                <div>
+                <div
+                  className="clickable"
+                  role="button"
+                  title="Ver la lista detrás de este número"
+                  onClick={() =>
+                    openList(
+                      "migracion",
+                      "incomplete"
+                    )
+                  }
+                >
                   <span>
                     Sin cliente
                   </span>
@@ -3320,7 +3388,17 @@ export default function ExecutiveDashboard() {
                   </strong>
                 </div>
 
-                <div>
+                <div
+                  className="clickable"
+                  role="button"
+                  title="Ver la lista detrás de este número"
+                  onClick={() =>
+                    openList(
+                      "migracion",
+                      "incomplete"
+                    )
+                  }
+                >
                   <span>
                     Sin producto
                   </span>
@@ -3333,7 +3411,17 @@ export default function ExecutiveDashboard() {
                   </strong>
                 </div>
 
-                <div>
+                <div
+                  className="clickable"
+                  role="button"
+                  title="Ver la lista detrás de este número"
+                  onClick={() =>
+                    openList(
+                      "migracion",
+                      "incomplete"
+                    )
+                  }
+                >
                   <span>
                     Sin compañía
                   </span>
@@ -3346,7 +3434,17 @@ export default function ExecutiveDashboard() {
                   </strong>
                 </div>
 
-                <div>
+                <div
+                  className="clickable"
+                  role="button"
+                  title="Ver la lista detrás de este número"
+                  onClick={() =>
+                    openList(
+                      "migracion",
+                      "incomplete"
+                    )
+                  }
+                >
                   <span>
                     Sin vencimiento
                   </span>
@@ -3359,7 +3457,17 @@ export default function ExecutiveDashboard() {
                   </strong>
                 </div>
 
-                <div>
+                <div
+                  className="clickable"
+                  role="button"
+                  title="Ver la lista detrás de este número"
+                  onClick={() =>
+                    openList(
+                      "migracion",
+                      "unmatched"
+                    )
+                  }
+                >
                   <span>
                     Gestiones sin match
                   </span>
@@ -3472,6 +3580,9 @@ export default function ExecutiveDashboard() {
 
                   <Kpi
                     title="Vínculo con la cartera"
+                    onClick={() =>
+                      openList("crm", "matched")
+                    }
                     value={percent(
                       data.crm.kpis.matchRate
                     )}
