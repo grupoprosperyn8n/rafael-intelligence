@@ -15,6 +15,11 @@ type CacheEntry = {
 
 const globalCache = globalThis as typeof globalThis & {
   __rafaelCache?: Map<string, CacheEntry>;
+  __rafaelPending?: Map<
+    string,
+    Promise<AirtableRecord[]>
+  >;
+  __rafaelGates?: Map<string, number>;
 };
 
 if (!globalCache.__rafaelCache) {
@@ -24,7 +29,133 @@ if (!globalCache.__rafaelCache) {
 const cache = globalCache.__rafaelCache;
 
 function cacheMinutes() {
-  return Number(process.env.DASHBOARD_CACHE_MINUTES || 15);
+  return Number(
+    process.env.DASHBOARD_CACHE_MINUTES || 15
+  );
+}
+
+/*
+ * Airtable limita a ~5 requests/segundo POR BASE (y devuelve 429 cuando
+ * te pasás). El cockpit lee tablas grandes paginadas (GESTIÓN GENERAL
+ * ≈ 35k filas = cientos de páginas) y además varias tablas en paralelo,
+ * así que un rebuild podía pasarse del límite y romper el dashboard.
+ *
+ * Medidas:
+ *
+ *  - paceBase(): asegura un intervalo mínimo entre requests por base
+ *    (AIRTABLE_MIN_INTERVAL_MS, por defecto 250 ms ⇒ ~4 req/s).
+ *  - Reintentos con backoff exponencial + jitter ante 429/5xx y errores
+ *    de red, respetando el header Retry-After.
+ *  - Dedupe de lecturas en vuelo: si dos rebuilds piden la misma tabla
+ *    a la vez, comparten la MISMA descarga (jamás dos scans paralelos).
+ */
+
+const MIN_INTERVAL_MS = Number(
+  process.env.AIRTABLE_MIN_INTERVAL_MS || 250
+);
+
+const MAX_ATTEMPTS = 6;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) =>
+    setTimeout(resolve, ms)
+  );
+}
+
+async function paceBase(baseId: string) {
+  if (!globalCache.__rafaelGates) {
+    globalCache.__rafaelGates = new Map();
+  }
+
+  const gates = globalCache.__rafaelGates;
+
+  const now = Date.now();
+  const last = gates.get(baseId) || 0;
+  const readyAt = Math.max(
+    now,
+    last + MIN_INTERVAL_MS
+  );
+
+  gates.set(baseId, readyAt);
+
+  const wait = readyAt - now;
+
+  if (wait > 0) {
+    await sleep(wait);
+  }
+}
+
+async function fetchPage(
+  baseId: string,
+  url: string,
+  tableName: string
+): Promise<Response> {
+  let response: Response | null = null;
+
+  for (
+    let attempt = 0;
+    attempt < MAX_ATTEMPTS;
+    attempt++
+  ) {
+    await paceBase(baseId);
+
+    try {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+        },
+        cache: "no-store",
+      });
+    } catch (error: any) {
+      const delay =
+        Math.min(8000, 1000 * 2 ** attempt) *
+        (0.7 + Math.random() * 0.6);
+
+      console.warn(
+        `Airtable red en ${tableName} (intento ${
+          attempt + 1
+        }/${MAX_ATTEMPTS}): reintento en ${Math.round(
+          delay / 1000
+        )}s — ${error?.message || error}`
+      );
+
+      await sleep(delay);
+      continue;
+    }
+
+    if (response.ok) {
+      return response;
+    }
+
+    const retryable =
+      response.status === 429 ||
+      response.status >= 500;
+
+    if (!retryable) {
+      return response;
+    }
+
+    const retryAfter = Number(
+      response.headers.get("retry-after") || 0
+    );
+
+    const delay = retryAfter
+      ? retryAfter * 1000
+      : Math.min(16000, 1000 * 2 ** attempt) *
+        (0.7 + Math.random() * 0.6);
+
+    console.warn(
+      `Airtable ${response.status} en ${tableName} (intento ${
+        attempt + 1
+      }/${MAX_ATTEMPTS}): reintento en ${Math.round(
+        delay / 1000
+      )}s`
+    );
+
+    await sleep(delay);
+  }
+
+  return response!;
 }
 
 export async function airtableTable(
@@ -44,56 +175,77 @@ export async function airtableTable(
     throw new Error("AIRTABLE_TOKEN no configurado.");
   }
 
-  let offset: string | undefined;
-  const records: AirtableRecord[] = [];
+  if (!globalCache.__rafaelPending) {
+    globalCache.__rafaelPending = new Map();
+  }
 
-  do {
-    const params = new URLSearchParams();
+  const pending = globalCache.__rafaelPending;
 
-    params.set("pageSize", "100");
+  const inFlight = pending.get(cacheKey);
 
-    if (offset) {
-      params.set("offset", offset);
-    }
+  if (inFlight) {
+    return inFlight;
+  }
 
-    fields?.forEach((field) => {
-      params.append("fields[]", field);
-    });
+  const load = (async () => {
+    let offset: string | undefined;
+    const records: AirtableRecord[] = [];
 
-    const url =
-      `https://api.airtable.com/v0/${baseId}/` +
-      `${encodeURIComponent(tableName)}?${params.toString()}`;
+    do {
+      const params = new URLSearchParams();
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-      },
-      cache: "no-store",
-    });
+      params.set("pageSize", "100");
 
-    if (!response.ok) {
-      const body = await response.text();
+      if (offset) {
+        params.set("offset", offset);
+      }
 
-      throw new Error(
-        `Error Airtable ${response.status} en ${tableName}: ${body}`
+      fields?.forEach((field) => {
+        params.append("fields[]", field);
+      });
+
+      const url =
+        `https://api.airtable.com/v0/${baseId}/` +
+        `${encodeURIComponent(tableName)}?${params.toString()}`;
+
+      const response = await fetchPage(
+        baseId,
+        url,
+        tableName
       );
-    }
 
-    const data = await response.json();
+      if (!response.ok) {
+        const body = await response.text();
 
-    records.push(...(data.records || []));
+        throw new Error(
+          `Error Airtable ${response.status} en ${tableName}: ${body}`
+        );
+      }
 
-    offset = data.offset;
-  } while (offset);
+      const data = await response.json();
 
-  cache.set(cacheKey, {
-    records,
-    expires:
-      Date.now() +
-      cacheMinutes() * 60 * 1000,
-  });
+      records.push(...(data.records || []));
 
-  return records;
+      offset = data.offset;
+    } while (offset);
+
+    cache.set(cacheKey, {
+      records,
+      expires:
+        Date.now() +
+        cacheMinutes() * 60 * 1000,
+    });
+
+    return records;
+  })();
+
+  pending.set(cacheKey, load);
+
+  try {
+    return await load;
+  } finally {
+    pending.delete(cacheKey);
+  }
 }
 
 export function clearDashboardCache() {
