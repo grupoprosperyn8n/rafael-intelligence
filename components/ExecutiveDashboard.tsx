@@ -30,23 +30,35 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   Building2,
+  ChevronDown,
   CircleDollarSign,
   Clock3,
   Database,
   HeartHandshake,
+  HelpCircle,
+  Lightbulb,
   MessageSquareText,
   RefreshCcw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
   Target,
   TrendingUp,
   UserRoundCheck,
   Users,
+  X,
 } from "lucide-react";
 
 import type {
   DashboardResponse,
 } from "@/lib/types";
+
+import {
+  MODULE_HELP,
+  type HelpAction,
+  type ModuleHelp,
+} from "@/lib/help";
 
 type Tab =
   | "pulso"
@@ -161,6 +173,308 @@ function Badge({
   );
 }
 
+function presetRange(
+  preset: "month" | "lastMonth" | "year" | "all"
+) {
+  const now = new Date();
+
+  const pad = (n: number) =>
+    String(n).padStart(2, "0");
+
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${pad(
+      d.getMonth() + 1
+    )}-${pad(d.getDate())}`;
+
+  if (preset === "all") {
+    return { from: "", to: "" };
+  }
+
+  if (preset === "year") {
+    return {
+      from: `${now.getFullYear()}-01-01`,
+      to: iso(now),
+    };
+  }
+
+  if (preset === "month") {
+    return {
+      from: `${now.getFullYear()}-${pad(
+        now.getMonth() + 1
+      )}-01`,
+      to: iso(now),
+    };
+  }
+
+  const first = new Date(
+    now.getFullYear(),
+    now.getMonth() - 1,
+    1
+  );
+
+  const last = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    0
+  );
+
+  return { from: iso(first), to: iso(last) };
+}
+
+function HelpZone({
+  help,
+  id,
+  onAction,
+}: {
+  help: ModuleHelp;
+  id: string;
+  onAction: (action: HelpAction) => void;
+}) {
+  const [open, setOpen] =
+    useState(false);
+
+  useEffect(() => {
+    let seen = true;
+
+    try {
+      seen = Boolean(
+        localStorage.getItem(
+          `r360-help-${id}`
+        )
+      );
+    } catch {}
+
+    if (!seen) {
+      setOpen(true);
+
+      try {
+        localStorage.setItem(
+          `r360-help-${id}`,
+          "1"
+        );
+      } catch {}
+    }
+  }, [id]);
+
+  return (
+    <section
+      className={`help-zone${
+        open ? " open" : ""
+      }`}
+    >
+      <button
+        className="help-head"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="help-badge">
+          <HelpCircle size={16} />
+        </span>
+
+        <span className="help-copy">
+          <strong>
+            ¿Cómo funciona {help.title}?
+          </strong>
+
+          <em>{help.tagline}</em>
+        </span>
+
+        <span className="help-toggle">
+          {open ? "Cerrar guía" : "Abrir guía"}
+
+          <ChevronDown
+            size={16}
+            className={
+              open ? "rot" : undefined
+            }
+          />
+        </span>
+      </button>
+
+      {open && (
+        <div className="help-body">
+          <div className="help-grid">
+            <div>
+              <h4>¿Qué es?</h4>
+
+              <ul>
+                {help.what.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4>¿Qué mide?</h4>
+
+              <ul>
+                {help.measures.map(
+                  (item) => (
+                    <li key={item}>
+                      {item}
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+
+            <div>
+              <h4>
+                ¿Para qué te sirve?
+              </h4>
+
+              <ul>
+                {help.usage.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {help.suggestions.length >
+            0 && (
+            <div className="help-suggestions">
+              <h4>
+                <Lightbulb size={13} />
+                Sugerencias
+              </h4>
+
+              <div className="help-chips">
+                {help.suggestions.map(
+                  (suggestion) => (
+                    <button
+                      key={suggestion.text}
+                      className="help-chip"
+                      onClick={() => {
+                        if (
+                          suggestion.action
+                        ) {
+                          onAction(
+                            suggestion.action
+                          );
+                        }
+                      }}
+                    >
+                      {suggestion.text}
+
+                      {suggestion.action && (
+                        <ArrowUpRight
+                          size={13}
+                        />
+                      )}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SuggestionsStrip({
+  data,
+  onGoto,
+}: {
+  data: DashboardResponse;
+  onGoto: (tab: Tab) => void;
+}) {
+  const items: {
+    text: string;
+    tab: Tab;
+  }[] = [];
+
+  if (data.current.expires7 > 0) {
+    items.push({
+      text: `${number(
+        data.current.expires7
+      )} pólizas vencen en ≤7 días — hablá hoy`,
+      tab: "retencion",
+    });
+  } else if (data.current.expires30 > 0) {
+    items.push({
+      text: `${number(
+        data.current.expires30
+      )} pólizas vencen este mes — prepará la ronda`,
+      tab: "retencion",
+    });
+  }
+
+  if (
+    data.opportunity
+      .reactivationCandidates > 0
+  ) {
+    items.push({
+      text: `${number(
+        data.opportunity
+          .reactivationCandidates
+      )} clientes para reactivar`,
+      tab: "reactivacion",
+    });
+  }
+
+  const topCross = data.crossSell?.[0];
+
+  if (
+    topCross &&
+    topCross.customers > 0
+  ) {
+    items.push({
+      text: `${topCross.opportunity}: ${number(
+        topCross.customers
+      )} clientes para ampliar`,
+      tab: "cross",
+    });
+  }
+
+  if (
+    data.crm?.available &&
+    data.crm.kpis?.leads > 0
+  ) {
+    const leads = data.crm.kpis.leads;
+
+    items.push({
+      text: `CRM: ${number(leads)} ${
+        leads === 1
+          ? "oportunidad abierta"
+          : "oportunidades abiertas"
+      }`,
+      tab: "crm",
+    });
+  }
+
+  items.push({
+    text: `Migración: ${percent(
+      data.migration.operationMatchRate
+    )} de gestiones vinculadas`,
+    tab: "migracion",
+  });
+
+  if (!items.length) return null;
+
+  return (
+    <section className="sug-strip">
+      <span className="sug-label">
+        <Sparkles size={14} />
+        Sugerencias de hoy
+      </span>
+
+      <div className="sug-chips">
+        {items.slice(0, 5).map((item) => (
+          <button
+            key={item.text}
+            className="sug-chip"
+            onClick={() => onGoto(item.tab)}
+          >
+            {item.text}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function ExecutiveDashboard() {
   const [data, setData] =
     useState<DashboardResponse | null>(
@@ -188,7 +502,11 @@ export default function ExecutiveDashboard() {
       search: "",
     });
 
-  async function load() {
+  async function load(
+    override?: typeof filters
+  ) {
+    const active = override || filters;
+
     setLoading(true);
     setError("");
 
@@ -196,7 +514,7 @@ export default function ExecutiveDashboard() {
       const query =
         new URLSearchParams();
 
-      Object.entries(filters).forEach(
+      Object.entries(active).forEach(
         ([key, value]) => {
           if (value) {
             query.set(key, value);
@@ -235,6 +553,67 @@ export default function ExecutiveDashboard() {
   useEffect(() => {
     load();
   }, []);
+
+  function applyHelpAction(
+    action: HelpAction
+  ) {
+    if (action.kind === "goto") {
+      setTab(action.tab);
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+
+      return;
+    }
+
+    if (action.kind === "dates") {
+      const range = presetRange(
+        action.preset
+      );
+
+      const next = {
+        ...filters,
+        from: range.from,
+        to: range.to,
+      };
+
+      setFilters(next);
+
+      load(next);
+    }
+  }
+
+  function removeFilter(
+    key: keyof typeof filters
+  ) {
+    const next = {
+      ...filters,
+      [key]: "",
+    };
+
+    setFilters(next);
+
+    load(next);
+  }
+
+  function clearFilters() {
+    const next = {
+      from: "",
+      to: "",
+      office: "",
+      product: "",
+      employee: "",
+      channel: "",
+      company: "",
+      search: "",
+    };
+
+    setFilters(next);
+
+    load(next);
+  }
 
   const totalOpportunity =
     useMemo(() => {
@@ -285,7 +664,7 @@ export default function ExecutiveDashboard() {
 
         <p>{error}</p>
 
-        <button onClick={load}>
+        <button onClick={() => load()}>
           Reintentar
         </button>
       </main>
@@ -293,6 +672,27 @@ export default function ExecutiveDashboard() {
   }
 
   if (!data) return null;
+
+  const filterLabels: Record<
+    keyof typeof filters,
+    (value: string) => string
+  > = {
+    from: (value) => `Desde ${value}`,
+    to: (value) => `Hasta ${value}`,
+    office: (value) => `Oficina: ${value}`,
+    product: (value) => `Producto: ${value}`,
+    employee: (value) => `Empleado: ${value}`,
+    channel: (value) => `Canal: ${value}`,
+    company: (value) => `Compañía: ${value}`,
+    search: (value) => `Búsqueda: “${value}”`,
+  };
+
+  const activeFilterChips = (
+    Object.entries(filters) as [
+      keyof typeof filters,
+      string,
+    ][]
+  ).filter(([, value]) => value);
 
   return (
     <main className="dashboard-shell">
@@ -436,7 +836,7 @@ export default function ExecutiveDashboard() {
 
             <button
               className="refresh-button"
-              onClick={load}
+              onClick={() => load()}
             >
               <RefreshCcw size={16} />
 
@@ -445,7 +845,51 @@ export default function ExecutiveDashboard() {
           </div>
         </header>
 
+        <SuggestionsStrip
+          data={data}
+          onGoto={(nextTab) => {
+            setTab(nextTab);
+
+            window.scrollTo({
+              top: 0,
+              behavior: "smooth",
+            });
+          }}
+        />
+
         <section className="filter-panel">
+          <div className="filter-presets">
+            {(
+              [
+                ["Este mes", "month"],
+                ["Mes pasado", "lastMonth"],
+                ["Este año", "year"],
+                ["Todo el tiempo", "all"],
+              ] as const
+            ).map(([label, preset]) => (
+              <button
+                key={label}
+                className="preset-button"
+                onClick={() => {
+                  const range =
+                    presetRange(preset);
+
+                  const next = {
+                    ...filters,
+                    from: range.from,
+                    to: range.to,
+                  };
+
+                  setFilters(next);
+
+                  load(next);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <input
             type="date"
             value={filters.from}
@@ -547,6 +991,32 @@ export default function ExecutiveDashboard() {
           </select>
 
           <select
+            value={filters.employee}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                employee:
+                  e.target.value,
+              })
+            }
+          >
+            <option value="">
+              Todos los empleados
+            </option>
+
+            {data.filters.employees.map(
+              (value) => (
+                <option
+                  key={value}
+                  value={value}
+                >
+                  {value}
+                </option>
+              )
+            )}
+          </select>
+
+          <select
             value={filters.company}
             onChange={(e) =>
               setFilters({
@@ -574,14 +1044,52 @@ export default function ExecutiveDashboard() {
 
           <button
             className="primary-button"
-            onClick={load}
+            onClick={() => load()}
           >
             Aplicar filtros
           </button>
+
+          {activeFilterChips.length > 0 && (
+            <div className="filter-active">
+              {activeFilterChips.map(
+                ([key, value]) => (
+                  <button
+                    key={key}
+                    className="filter-chip"
+                    onClick={() =>
+                      removeFilter(key)
+                    }
+                  >
+                    {filterLabels[key](value)}
+
+                    <X size={12} />
+                  </button>
+                )
+              )}
+
+              <button
+                className="filter-chip clear"
+                onClick={clearFilters}
+              >
+                Limpiar todo
+              </button>
+            </div>
+          )}
+
+          <p className="filter-hint">
+            <SlidersHorizontal size={12} />
+            Estos filtros afectan a todos los
+            módulos del tablero.
+          </p>
         </section>
 
         {tab === "pulso" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.pulso}
+              id="pulso"
+              onAction={applyHelpAction}
+            />
             <section className="kpi-grid">
               <Kpi
                 title="Clientes históricos"
@@ -867,6 +1375,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "cartera" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.cartera}
+              id="cartera"
+              onAction={applyHelpAction}
+            />
             <div className="notice warning-notice">
               <AlertTriangle
                 size={20}
@@ -1086,6 +1599,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "retencion" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.retencion}
+              id="retencion"
+              onAction={applyHelpAction}
+            />
             <section className="kpi-grid">
               <Kpi
                 title="Vencen ≤7 días"
@@ -1160,6 +1678,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "reactivacion" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.reactivacion}
+              id="reactivacion"
+              onAction={applyHelpAction}
+            />
             <section className="kpi-grid">
               <Kpi
                 title="Candidatos detectados"
@@ -1251,6 +1774,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "cross" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.cross}
+              id="cross"
+              onAction={applyHelpAction}
+            />
             <section className="kpi-grid">
               <Kpi
                 title="Una sola póliza"
@@ -1313,6 +1841,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "clientes" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.clientes}
+              id="clientes"
+              onAction={applyHelpAction}
+            />
             <Section
               title="Cliente 360°"
               subtitle="Buscar por nombre, DNI o teléfono"
@@ -1343,7 +1876,7 @@ export default function ExecutiveDashboard() {
 
                 <button
                   className="primary-button"
-                  onClick={load}
+                  onClick={() => load()}
                 >
                   Buscar cliente
                 </button>
@@ -1459,6 +1992,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "migracion" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.migracion}
+              id="migracion"
+              onAction={applyHelpAction}
+            />
             <section className="kpi-grid">
               <Kpi
                 title="Clientes"
@@ -1601,6 +2139,11 @@ export default function ExecutiveDashboard() {
 
         {tab === "crm" && (
           <>
+            <HelpZone
+              help={MODULE_HELP.crm}
+              id="crm"
+              onAction={applyHelpAction}
+            />
             {!data.crm.available ? (
               <Section
                 title="CRM · Venta y gestión"
