@@ -668,8 +668,23 @@ th {
   border: 1px solid var(--border);
   border-radius: 11px;
 
-  display: flex;
-  justify-content: space-between;
+  /*
+   * Antes: flex + space-between → con 3 hijos, la posición del
+   * del medio ("N clientes") dependía del ancho del nombre de
+   * cada fila (medido: 4 posiciones X distintas). Ahora: grilla
+   * proporcional con mín 0 → geometría idéntica en todas las
+   * filas, la del medio arranca siempre en el mismo X.
+   */
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.15fr)
+    minmax(0, 0.55fr)
+    minmax(0, 0.5fr);
+
+  gap: 12px;
+
+  align-items: center;
 }
 
 .opportunity-value {
@@ -1960,6 +1975,8 @@ footer {
   font-weight: 700;
 
   white-space: nowrap;
+
+  text-align: right;
 }
 
 .quality-grid div.clickable {
