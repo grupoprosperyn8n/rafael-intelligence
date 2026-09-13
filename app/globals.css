@@ -1024,6 +1024,16 @@ footer {
   color: var(--muted);
 }
 
+.loading-hint {
+  margin-top: 10px;
+
+  color: var(--muted);
+
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
 .loading-screen button {
   border: none;
   border-radius: 9px;

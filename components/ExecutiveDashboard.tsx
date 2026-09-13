@@ -264,6 +264,12 @@ export default function ExecutiveDashboard() {
           Cruzando clientes,
           historial y pólizas...
         </p>
+
+        <span className="loading-hint">
+          La primera carga puede tardar
+          hasta 2 minutos.
+          Después abre al instante.
+        </span>
       </main>
     );
   }
