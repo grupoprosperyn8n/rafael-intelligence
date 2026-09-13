@@ -26,9 +26,12 @@ AIRTABLE AGÉNTICO (appuhslj3GFf60Tea)
   ├── EMPLEADOS           ├── OFICINAS
         │
         ▼
+CRM VOCERO (Postgres) → snapshot SOLO LECTURA (contactos · conversaciones · pipeline)
+        │
+        ▼
  MOTOR DE ANALÍTICA (lib/analytics.ts)
    cartera · retención · reactivación · cross-selling
-   migración · next best action
+   migración · venta CRM · macheo CRM↔cartera
         │
         ▼
  NEXT.JS / TYPESCRIPT  →  COCKPIT EJECUTIVO
@@ -45,13 +48,16 @@ rafael-intelligence/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
-│   └── ExecutiveDashboard.tsx   (7 módulos, filtros, búsqueda)
+│   └── ExecutiveDashboard.tsx   (8 módulos, filtros, búsqueda)
 ├── lib/
 │   ├── airtable.ts              (paginación completa + caché 15 min)
 │   ├── analytics.ts             (el corazón: cruce + BI)
 │   ├── config.ts                (bases, tablas y campos Airtable)
+│   ├── crm.ts                   (3ª fuente: snapshot del CRM + macheo en memoria)
 │   ├── normalize.ts             (DNI, teléfono, email, nombre)
 │   └── types.ts
+├── scripts/
+│   └── sync-crm.mjs             (snapshot SOLO LECTURA del CRM → data/crm-snapshot.json)
 ├── .env.example
 ├── next.config.mjs
 ├── package.json
@@ -79,6 +85,9 @@ rafael-intelligence/
 5. **Venta cruzada** — clientes con 1 póliza y oportunidades por producto (Auto→Auxilio/Hogar/Vida, Moto→AP/Vida…).
 6. **Cliente 360°** — búsqueda por nombre/DNI/teléfono, score y próxima mejor acción.
 7. **Calidad y avance de migración** — tasas de match y campos faltantes de la migración.
+8. **CRM · Venta y gestión** (3ª fuente) — pipeline comercial del CRM Vocero (etapas y montos),
+   actividad de conversaciones y mensajes (incluye respuestas de IA), y **macheo CRM ↔ cartera**:
+   contactos cruzados contra clientes/pólizas/gestiones, prima activa vinculada y vencimientos ≤ 30 días.
 
 Filtros globales: rango de fechas, oficina, producto, canal, compañía.
 
@@ -123,6 +132,7 @@ AIRTABLE_TOKEN=pat_...        # SOLO server-side
 AIRTABLE_BASE_HISTORICA=appIO1WFzawAfos4E
 AIRTABLE_BASE_AGENTICA=appuhslj3GFf60Tea
 DASHBOARD_CACHE_MINUTES=15
+# CRM_SNAPSHOT_PATH=./data/crm-snapshot.json   # opcional; default: data/crm-snapshot.json
 ```
 
 > Primera carga: ~2 minutos (34.603 gestiones, paginación 100/página). Luego queda en
@@ -139,6 +149,10 @@ DASHBOARD_CACHE_MINUTES=15
 - Env vars (Coolify, runtime): `AIRTABLE_TOKEN`, `AIRTABLE_BASE_HISTORICA`, `AIRTABLE_BASE_AGENTICA`, `DASHBOARD_CACHE_MINUTES=15`. El token NUNCA llega al cliente (server-side solamente, sin prefijo `NEXT_PUBLIC_`).
 - Redeploy: `git push` + encolar deploy (`queue_application_deployment` vía PHP en el contenedor `coolify`) — esta instancia no auto-despliega por webhook.
 - Verificación post-deploy: home 200 con TLS (Let's Encrypt); `GET /api/dashboard` → 200 (primera carga ~2 min, luego caché); 0 apariciones del token en HTML/bundles.
+- **Snapshot del CRM en producción**: el Postgres del CRM se exporta a `data/crm-snapshot.json` con un script
+  que vive en el propio VPS (`/root/rafael-intelligence/sync_snapshot.sh`, **cron cada 2 h**) y llega al contenedor
+  por **file mount** de Coolify (`/data/rafael-intelligence/crm-snapshot.json` → `/app/data/crm-snapshot.json`).
+  Solo lectura; se excluyen los registros de prueba (`is_test`).
 
 ---
 
@@ -161,6 +175,9 @@ DASHBOARD_CACHE_MINUTES=15
 9. **Cartera cargada claramente parcial**: solo 2 compañías (TRIUNFO 2.677 pólizas, FEDERACIÓN PATRONAL 1) — coherente
    con "en proceso de carga"; la UI lo advierte explícitamente.
 10. Historial: 12.134 altas vs 6.289 anulaciones (ratio 51,8%) y 3.319 siniestros en 21 meses de gestiones (2025-01 → 2026-09).
+11. **CRM recién lanzado**: los únicos registros "reales" hoy son los de la puesta en marcha; el resto
+    está marcado como prueba (`is_test`) y se excluye por diseño. Las métricas del tab CRM crecerán
+    con el uso real (el snapshot se regenera cada 2 h).
 
 ---
 
