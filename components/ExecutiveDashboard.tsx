@@ -34,6 +34,7 @@ import {
   Clock3,
   Database,
   HeartHandshake,
+  MessageSquareText,
   RefreshCcw,
   Search,
   ShieldCheck,
@@ -54,6 +55,7 @@ type Tab =
   | "reactivacion"
   | "cross"
   | "clientes"
+  | "crm"
   | "migracion";
 
 function money(value: number) {
@@ -336,6 +338,11 @@ export default function ExecutiveDashboard() {
               "clientes",
               "Cliente 360°",
               Users,
+            ],
+            [
+              "crm",
+              "CRM · Venta y gestión",
+              MessageSquareText,
             ],
             [
               "migracion",
@@ -1583,6 +1590,494 @@ export default function ExecutiveDashboard() {
                 </div>
               </div>
             </Section>
+          </>
+        )}
+
+        {tab === "crm" && (
+          <>
+            {!data.crm.available ? (
+              <Section
+                title="CRM · Venta y gestión"
+                subtitle="Datos del CRM Vocero (solo lectura)"
+              >
+                <div className="empty-state">
+                  Todavía no hay snapshot del CRM en este
+                  entorno. Ejecutá{" "}
+                  <span className="mono">
+                    npm run sync-crm
+                  </span>{" "}
+                  para generarlo y volvé a cargar el tablero.
+                </div>
+              </Section>
+            ) : (
+              <>
+                <section className="kpi-grid">
+                  <Kpi
+                    title="Contactos del CRM"
+                    value={number(
+                      data.crm.kpis.contacts
+                    )}
+                    subtitle={`${number(
+                      data.crm.kpis.conversations
+                    )} conversaciones · ${number(
+                      data.crm.kpis.openConversations
+                    )} abiertas`}
+                    icon={<Users />}
+                  />
+
+                  <Kpi
+                    title="Mensajes intercambiados"
+                    value={number(
+                      data.crm.kpis.messages
+                    )}
+                    subtitle={`${number(
+                      data.crm.kpis.inbound
+                    )} recibidos · ${number(
+                      data.crm.kpis.outbound
+                    )} enviados`}
+                    icon={<MessageSquareText />}
+                    tone="accent"
+                  />
+
+                  <Kpi
+                    title="Respuestas con IA"
+                    value={number(
+                      data.crm.kpis.ai
+                    )}
+                    subtitle="Mensajes generados por el agente"
+                    icon={<ShieldCheck />}
+                    tone="success"
+                  />
+
+                  <Kpi
+                    title="Oportunidades abiertas"
+                    value={number(
+                      data.crm.kpis.leads
+                    )}
+                    subtitle={`${number(
+                      data.crm.kpis.converted
+                    )} ganadas (${percent(
+                      data.crm.kpis.conversionRate
+                    )})`}
+                    icon={<Target />}
+                  />
+
+                  <Kpi
+                    title="Monto en pipeline"
+                    value={money(
+                      data.crm.kpis.pipelineAmount
+                    )}
+                    subtitle="Suma de las oportunidades cargadas"
+                    icon={<CircleDollarSign />}
+                    tone="warning"
+                  />
+
+                  <Kpi
+                    title="Vínculo con la cartera"
+                    value={percent(
+                      data.crm.kpis.matchRate
+                    )}
+                    subtitle={`${number(
+                      data.crm.kpis.matchedContacts
+                    )} de ${number(
+                      data.crm.kpis.contacts
+                    )} contactos cruzados con SGSA`}
+                    icon={<HeartHandshake />}
+                  />
+
+                  <Kpi
+                    title="Prima activa vinculada"
+                    value={money(
+                      data.crm.kpis.matchedPremium
+                    )}
+                    subtitle={`Pólizas activas de contactos del CRM · ${number(
+                      data.crm.kpis.expiring30
+                    )} vencen ≤ 30 días`}
+                    icon={<BriefcaseBusiness />}
+                    tone="success"
+                  />
+
+                  <Kpi
+                    title="Oportunidades ligadas"
+                    value={number(
+                      data.crm.kpis.leadsLinked
+                    )}
+                    subtitle={`${money(
+                      data.crm.kpis.linkedAmount
+                    )} en juego sobre clientes de la cartera`}
+                    icon={<Activity />}
+                  />
+                </section>
+
+                <Section
+                  title="Venta — pipeline desde el CRM"
+                  subtitle="Cómo avanza cada oportunidad según la etapa del tablero comercial"
+                >
+                  <div className="stage-list">
+                    {data.crm.pipeline.map(
+                      (stage) => {
+                        const max = Math.max(
+                          ...data.crm.pipeline.map(
+                            (item) => item.amount
+                          ),
+                          1
+                        );
+
+                        const width = Math.max(
+                          (stage.amount / max) * 100,
+                          stage.amount > 0 ? 3 : 0
+                        );
+
+                        return (
+                          <div
+                            className="stage-row"
+                            key={stage.name}
+                          >
+                            <div className="stage-name">
+                              {stage.name}
+
+                              <small>
+                                {stage.kind === "won"
+                                  ? "ganada"
+                                  : stage.kind === "lost"
+                                    ? "perdida"
+                                    : "en curso"}
+                              </small>
+                            </div>
+
+                            <div className="stage-track">
+                              <div
+                                className="stage-fill"
+                                style={{
+                                  width: `${width}%`,
+                                }}
+                              />
+                            </div>
+
+                            <div className="stage-value">
+                              <strong>
+                                {money(stage.amount)}
+                              </strong>
+
+                              {" · "}
+
+                              {number(stage.leads)}{" "}
+                              {stage.leads === 1
+                                ? "oportunidad"
+                                : "oportunidades"}
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                </Section>
+
+                <div className="two-columns">
+                  <Section
+                    title="Gestión — mensajes por día"
+                    subtitle="Recibidos y enviados (últimos 30 días con actividad)"
+                  >
+                    <div className="chart-large">
+                      <ResponsiveContainer>
+                        <AreaChart
+                          data={data.crm.daily}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+
+                          <XAxis
+                            dataKey="day"
+                            tick={{ fontSize: 10 }}
+                            tickFormatter={(
+                              value
+                            ) =>
+                              String(value)
+                                .slice(5)
+                                .replace("-", "/")
+                            }
+                          />
+
+                          <YAxis
+                            tick={{ fontSize: 10 }}
+                            width={34}
+                          />
+
+                          <Tooltip />
+
+                          <Area
+                            type="monotone"
+                            dataKey="inbound"
+                            name="Recibidos"
+                            stroke="var(--primary)"
+                            fill="var(--primary)"
+                            fillOpacity={0.15}
+                            strokeWidth={2}
+                          />
+
+                          <Area
+                            type="monotone"
+                            dataKey="outbound"
+                            name="Enviados"
+                            stroke="#00c6f5"
+                            fill="#00c6f5"
+                            fillOpacity={0.12}
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </Section>
+
+                  <Section
+                    title="Canales y equipo"
+                    subtitle="Conversaciones según canal de entrada"
+                  >
+                    <div className="quality-grid">
+                      {data.crm.channels.map(
+                        (channel) => (
+                          <div
+                            key={channel.name}
+                          >
+                            <span>
+                              {channel.name}
+                            </span>
+
+                            <strong>
+                              {number(
+                                channel.value
+                              )}
+                            </strong>
+                          </div>
+                        )
+                      )}
+                    </div>
+
+                    <div className="crm-note">
+                      <Users size={15} />
+
+                      <span>
+                        <strong>
+                          {number(
+                            data.crm.kpis.users
+                          )}{" "}
+                          usuarios
+                        </strong>{" "}
+                        en el CRM ·{" "}
+                        {number(
+                          data.crm.kpis.closedConversations
+                        )}{" "}
+                        conversaciones cerradas
+                      </span>
+                    </div>
+                  </Section>
+                </div>
+
+                <Section
+                  title="Macheo con la cartera (CRM ↔ SGSA)"
+                  subtitle="Contactos del CRM cruzados contra clientes, pólizas activas y gestiones históricas"
+                >
+                  <div className="quality-grid">
+                    <div>
+                      <span>
+                        Contactos macheados
+                      </span>
+
+                      <strong>
+                        {number(
+                          data.crm.kpis.matchedContacts
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>Tasa de match</span>
+
+                      <strong>
+                        {percent(
+                          data.crm.kpis.matchRate
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Con póliza activa
+                      </span>
+
+                      <strong>
+                        {number(
+                          data.crm.kpis
+                            .matchedWithActive
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Prima activa vinculada
+                      </span>
+
+                      <strong>
+                        {money(
+                          data.crm.kpis
+                            .matchedPremium
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Vencen ≤ 30 días
+                      </span>
+
+                      <strong>
+                        {number(
+                          data.crm.kpis.expiring30
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Oportunidades ligadas
+                      </span>
+
+                      <strong>
+                        {number(
+                          data.crm.kpis.leadsLinked
+                        )}{" "}
+                        ·{" "}
+                        {money(
+                          data.crm.kpis.linkedAmount
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div
+                    className="table-wrap"
+                    style={{ marginTop: 16 }}
+                  >
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Contacto</th>
+                          <th>Canal</th>
+                          <th>Mensajes</th>
+                          <th>Vínculo</th>
+                          <th>Pólizas activas</th>
+                          <th>Prima activa</th>
+                          <th>Vence ≤ 30d</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {data.crm.rows
+                          .slice(0, 12)
+                          .map((row) => (
+                            <tr key={row.contactId}>
+                              <td>
+                                <strong>
+                                  {row.name}
+                                </strong>
+                              </td>
+
+                              <td>
+                                {row.channel || "—"}
+                              </td>
+
+                              <td>
+                                {number(
+                                  row.messages
+                                )}
+                              </td>
+
+                              <td>
+                                {row.link ===
+                                "sin-match" ? (
+                                  <Badge>
+                                    Sin vínculo
+                                  </Badge>
+                                ) : (
+                                  <>
+                                    <Badge
+                                      tone={
+                                        row.link ===
+                                        "sgsa"
+                                          ? "success"
+                                          : "accent"
+                                      }
+                                    >
+                                      {row.link ===
+                                      "sgsa"
+                                        ? "Vínculo directo"
+                                        : row.link ===
+                                            "telefono"
+                                          ? "Por teléfono"
+                                          : "Por nombre"}
+                                    </Badge>
+
+                                    {row.clientName && (
+                                      <div className="mono">
+                                        {
+                                          row.clientName
+                                        }
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </td>
+
+                              <td>
+                                {number(
+                                  row.activePolicies
+                                )}
+                              </td>
+
+                              <td>
+                                {row.activePremium >
+                                0
+                                  ? money(
+                                      row.activePremium
+                                    )
+                                  : "—"}
+                              </td>
+
+                              <td>
+                                {row.expiring30 > 0
+                                  ? number(
+                                      row.expiring30
+                                    )
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="crm-note">
+                    <RefreshCcw size={15} />
+
+                    <span>
+                      Snapshot de solo lectura del CRM
+                      al{" "}
+                      <strong>
+                        {new Date(
+                          data.crm.generatedAt ||
+                            data.generatedAt
+                        ).toLocaleString("es-AR")}
+                      </strong>{" "}
+                      · sin registros de prueba · se
+                      regenera con{" "}
+                      <span className="mono">
+                        npm run sync-crm
+                      </span>
+                    </span>
+                  </div>
+                </Section>
+              </>
+            )}
           </>
         )}
 

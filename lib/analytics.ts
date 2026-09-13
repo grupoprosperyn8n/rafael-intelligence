@@ -10,6 +10,11 @@ import {
 } from "./types";
 
 import {
+  buildCrmAnalytics,
+  loadCrmSnapshot,
+} from "./crm";
+
+import {
   normalizeDni,
   normalizeEmail,
   normalizeName,
@@ -1239,6 +1244,23 @@ export async function buildDashboard(
     });
 
   /*
+   * 14.b CRM VOCERO (snapshot de SOLO LECTURA)
+   *
+   * El CRM se cruza EN MEMORIA contra la cartera, igual que las otras
+   * fuentes: no se mezclan bases, se superponen sobre los mismos ids.
+   */
+
+  const crmSnapshot = loadCrmSnapshot();
+
+  const crm = buildCrmAnalytics(crmSnapshot, {
+    clients,
+    phoneIndex,
+    nameIndex,
+    clientActivePolicies,
+    clientHistory,
+  });
+
+  /*
    * 15. FILTROS DISPONIBLES
    */
 
@@ -1495,5 +1517,7 @@ export async function buildDashboard(
     },
 
     customers: customer360,
+
+    crm,
   };
 }
