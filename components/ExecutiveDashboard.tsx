@@ -51,7 +51,9 @@ import {
 } from "lucide-react";
 
 import type {
+  ClientInsight,
   DashboardResponse,
+  InsightMode,
 } from "@/lib/types";
 
 import {
@@ -501,6 +503,126 @@ export default function ExecutiveDashboard() {
       company: "",
       search: "",
     });
+
+  /*
+   * Motor de sugerencias del Cliente 360°: "algoritmo" | "dual" | "ia".
+   * Se recuerda por navegador; el default es "dual".
+   */
+  const [engine, setEngine] =
+    useState<InsightMode>("dual");
+
+  const [insights, setInsights] = useState<
+    Record<
+      string,
+      {
+        status: "loading" | "error" | "done";
+        data?: ClientInsight;
+        error?: string;
+      }
+    >
+  >({});
+
+  const [copiedInsight, setCopiedInsight] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved =
+        localStorage.getItem("r360-engine");
+
+      if (
+        saved === "algoritmo" ||
+        saved === "dual" ||
+        saved === "ia"
+      ) {
+        setEngine(saved);
+      }
+    } catch {}
+  }, []);
+
+  function chooseEngine(mode: InsightMode) {
+    setEngine(mode);
+
+    try {
+      localStorage.setItem("r360-engine", mode);
+    } catch {}
+  }
+
+  async function requestInsight(
+    customer: DashboardResponse["customers"][number],
+    mode: "dual" | "ia"
+  ) {
+    const key = `${mode}:${customer.id}`;
+
+    setInsights((prev) => ({
+      ...prev,
+      [key]: { status: "loading" },
+    }));
+
+    try {
+      const response = await fetch("/api/insight", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientId: customer.id,
+          mode,
+          context: {
+            name: customer.name,
+            activePolicies: customer.activePolicies,
+            historicalOperations:
+              customer.historicalOperations,
+            historicalAltas: customer.historicalAltas,
+            historicalAnulaciones:
+              customer.historicalAnulaciones,
+            historicalSiniestros:
+              customer.historicalSiniestros,
+            activePremium: customer.activePremium,
+            score: customer.score,
+            recommendation: customer.recommendation,
+            recommendationWhy: customer.recommendationWhy,
+            recommendationSteps:
+              customer.recommendationSteps,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.error || "La IA no respondió."
+        );
+      }
+
+      setInsights((prev) => ({
+        ...prev,
+        [key]: { status: "done", data: result.insight },
+      }));
+    } catch (err: any) {
+      setInsights((prev) => ({
+        ...prev,
+        [key]: {
+          status: "error",
+          error: err?.message || "La IA no respondió.",
+        },
+      }));
+    }
+  }
+
+  async function copyInsightMessage(
+    key: string,
+    text: string
+  ) {
+    try {
+      await navigator.clipboard.writeText(text);
+
+      setCopiedInsight(key);
+
+      setTimeout(() => setCopiedInsight(null), 1800);
+    } catch {}
+  }
 
   async function load(
     override?: typeof filters
@@ -1883,6 +2005,55 @@ export default function ExecutiveDashboard() {
               </div>
             </Section>
 
+            <div
+              className="engine-switch"
+              role="group"
+              aria-label="Motor de sugerencias"
+            >
+              <span className="engine-switch-label">
+                Motor de sugerencias
+              </span>
+
+              <button
+                className={`engine-option${
+                  engine === "algoritmo" ? " active" : ""
+                }`}
+                onClick={() => chooseEngine("algoritmo")}
+                title="Solo reglas del sistema: instantáneo y auditable"
+              >
+                Algoritmo solo
+              </button>
+
+              <button
+                className={`engine-option${
+                  engine === "dual" ? " active" : ""
+                }`}
+                onClick={() => chooseEngine("dual")}
+                title="El sistema prioriza con reglas y la IA enriquece el análisis"
+              >
+                Dual (IA + algoritmo)
+              </button>
+
+              <button
+                className={`engine-option${
+                  engine === "ia" ? " active" : ""
+                }`}
+                onClick={() => chooseEngine("ia")}
+                title="La IA analiza el contexto real y decide la mejor acción"
+              >
+                Solo IA
+              </button>
+
+              <span className="engine-hint">
+                {engine === "algoritmo" &&
+                  "Reglas del sistema: instantáneo, gratis y auditable."}
+                {engine === "dual" &&
+                  "El sistema prioriza con reglas y la IA enriquece el por qué y los pasos con el mismo contexto."}
+                {engine === "ia" &&
+                  "La IA analiza el contexto real del cliente y propone la mejor acción."}
+              </span>
+            </div>
+
             <div className="customer-grid">
               {data.customers.map(
                 (customer) => (
@@ -1965,57 +2136,193 @@ export default function ExecutiveDashboard() {
                     </div>
 
                     <div className="customer-recommendation">
-                      <span>
-                        Próxima mejor
-                        acción
-                      </span>
+                      {engine !== "ia" && (
+                        <>
+                          <span>
+                            Próxima mejor
+                            acción
+                          </span>
 
-                      <strong>
-                        {
-                          customer.recommendation
-                        }
-                      </strong>
+                          <strong>
+                            {
+                              customer.recommendation
+                            }
+                          </strong>
 
-                      {customer.recommendationWhy && (
-                        <p className="reco-why">
-                          {
-                            customer.recommendationWhy
-                          }
-                        </p>
-                      )}
-
-                      {customer
-                        .recommendationSteps
-                        ?.length > 0 && (
-                        <ul className="reco-steps">
-                          {customer.recommendationSteps.map(
-                            (step) => (
-                              <li key={step}>
-                                {step}
-                              </li>
-                            )
+                          {customer.recommendationWhy && (
+                            <p className="reco-why">
+                              {
+                                customer.recommendationWhy
+                              }
+                            </p>
                           )}
-                        </ul>
+
+                          {customer
+                            .recommendationSteps
+                            ?.length > 0 && (
+                            <ul className="reco-steps">
+                              {customer.recommendationSteps.map(
+                                (step) => (
+                                  <li key={step}>
+                                    {step}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          )}
+                        </>
                       )}
 
-                      {customer.backendUrl && (
-                        <a
-                          className="reco-link"
-                          href={
-                            customer.backendUrl
-                          }
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Abrir la ficha de este cliente en el backoffice"
-                        >
-                          Abrir ficha en el
-                          backoffice
-                          <ArrowUpRight
-                            size={13}
-                          />
-                        </a>
-                      )}
+                      {engine !== "algoritmo" &&
+                        (() => {
+                          const withAi =
+                            engine === "ia"
+                              ? ("ia" as const)
+                              : ("dual" as const);
+
+                          const insightKey = `${withAi}:${customer.id}`;
+
+                          const insightState =
+                            insights[insightKey];
+
+                          const insight =
+                            insightState?.status === "done"
+                              ? insightState.data
+                              : undefined;
+
+                          return (
+                            <div
+                              className={`ia-block${
+                                engine === "ia"
+                                  ? " primary"
+                                  : ""
+                              }`}
+                            >
+                              <span className="ia-badge">
+                                <Sparkles size={12} />
+                                {engine === "ia"
+                                  ? "Análisis con IA"
+                                  : "Análisis IA (extra)"}
+                              </span>
+
+                              {insightState?.status ===
+                                "loading" && (
+                                <div className="ia-loading">
+                                  Generando análisis
+                                  con la IA…
+                                </div>
+                              )}
+
+                              {!insightState && (
+                                <button
+                                  className="ia-button"
+                                  onClick={() =>
+                                    requestInsight(
+                                      customer,
+                                      withAi
+                                    )
+                                  }
+                                >
+                                  <Sparkles size={13} />
+                                  Generar análisis
+                                  con IA
+                                </button>
+                              )}
+
+                              {insightState?.status ===
+                                "error" && (
+                                <div className="ia-error">
+                                  <span>
+                                    {
+                                      insightState.error
+                                    }
+                                  </span>
+
+                                  <button
+                                    className="ia-button"
+                                    onClick={() =>
+                                      requestInsight(
+                                        customer,
+                                        withAi
+                                      )
+                                    }
+                                  >
+                                    Reintentar
+                                  </button>
+                                </div>
+                              )}
+
+                              {insight && (
+                                <>
+                                  <strong className="ia-accion">
+                                    {insight.accion}
+                                  </strong>
+
+                                  <p className="ia-why">
+                                    {insight.porQue}
+                                  </p>
+
+                                  <ul className="reco-steps">
+                                    {insight.pasos.map(
+                                      (paso) => (
+                                        <li key={paso}>
+                                          {paso}
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+
+                                  <div className="ia-message">
+                                    <p>
+                                      {
+                                        insight.mensajeWhatsapp
+                                      }
+                                    </p>
+
+                                    <button
+                                      className="ia-copy"
+                                      onClick={() => {
+                                        if (insight) {
+                                          copyInsightMessage(
+                                            insightKey,
+                                            insight.mensajeWhatsapp
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      {copiedInsight ===
+                                      insightKey
+                                        ? "Copiado ✓"
+                                        : "Copiar mensaje"}
+                                    </button>
+                                  </div>
+
+                                  <span className="ia-meta">
+                                    Generado con{" "}
+                                    {insight.model} · solo
+                                    sobre los datos del
+                                    sistema
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
+
+                    {customer.backendUrl && (
+                      <a
+                        className="reco-link"
+                        href={customer.backendUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Abrir la ficha de este cliente en el backoffice"
+                      >
+                        Abrir ficha en el
+                        backoffice
+                        <ArrowUpRight size={13} />
+                      </a>
+                    )}
                   </article>
                 )
               )}

@@ -339,3 +339,35 @@ export type CrmAnalytics = {
 
   rows: CrmMatchRow[];
 };
+
+/*
+ * Capa de IA del cockpit (Cliente 360°): "próxima mejor acción" generada
+ * server-side con DeepSeek — el mismo proveedor que usa el CRM.
+ * Modos del motor: "dual" (algoritmo + IA), "ia" (solo IA), "algoritmo".
+ */
+
+export type InsightMode = "dual" | "ia" | "algoritmo";
+
+export type ClientInsightContext = {
+  name: string;
+  activePolicies: number;
+  historicalOperations: number;
+  historicalAltas: number;
+  historicalAnulaciones: number;
+  historicalSiniestros: number;
+  activePremium: number;
+  score: number;
+  recommendation: string;
+  recommendationWhy: string;
+  recommendationSteps: string[];
+};
+
+export type ClientInsight = {
+  accion: string;
+  porQue: string;
+  pasos: string[];
+  mensajeWhatsapp: string;
+  model: string;
+  generatedAt: string;
+  cached: boolean;
+};
