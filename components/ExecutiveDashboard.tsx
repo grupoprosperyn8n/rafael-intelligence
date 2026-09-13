@@ -2222,12 +2222,12 @@ export default function ExecutiveDashboard() {
               />
 
               <Kpi
-                title="Pólizas cargadas"
+                title="Pólizas en el sistema nuevo"
                 value={number(
                   data.current
                     .loadedPolicies
                 )}
-                subtitle="Dato parcial de migración"
+                subtitle="Activas + no vigentes — cualquier estado"
                 icon={
                   <ShieldCheck
                     size={20}
@@ -2491,34 +2491,43 @@ export default function ExecutiveDashboard() {
                   Estos indicadores
                   reflejan únicamente
                   las pólizas ya
-                  migradas. No deben
-                  interpretarse como la
-                  cartera final de
-                  Rafael Allende.
+                  creadas y cargadas
+                  en el sistema nuevo
+                  (Seguros Agénticos).
+                  No deben interpretarse
+                  como la cartera final.
                 </p>
               </div>
             </div>
 
             <section className="kpi-grid">
               <Kpi
-                title="Pólizas cargadas"
+                title="Pólizas cargadas en el sistema nuevo"
                 value={number(
                   data.current
                     .loadedPolicies
                 )}
-                subtitle="Avance actual"
+                subtitle={`Activas ${number(
+                  data.current
+                    .activePolicies
+                )} · No vigentes ${number(
+                  data.current
+                    .loadedPolicies -
+                    data.current
+                      .activePolicies
+                )}`}
                 icon={
                   <BriefcaseBusiness />
                 }
               />
 
               <Kpi
-                title="Activas cargadas"
+                title="Pólizas activas"
                 value={number(
                   data.current
                     .activePolicies
                 )}
-                subtitle="Según estado actual"
+                subtitle="Vigentes o renovadas — según estado"
                 onClick={() =>
                   openList("cartera", "active")
                 }
