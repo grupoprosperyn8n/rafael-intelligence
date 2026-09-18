@@ -1718,14 +1718,33 @@ export async function buildDashboard(
     detail: string,
     extra: string,
     links: DrillLink[] = [],
-    dni?: string
-  ): DrillItem => ({
-    name: name || "—",
-    detail,
-    extra,
-    links,
-    ...(dni ? { dni } : {}),
-  });
+    dni?: string,
+    tags?: string[]
+  ): DrillItem => {
+    const cleanTags = [
+      ...new Set(
+        (tags || [])
+          .map((tag) => (tag || "").trim())
+          .filter(Boolean)
+      ),
+    ].slice(0, 3);
+
+    return {
+      name: name || "—",
+      detail,
+      extra,
+      links,
+      ...(dni ? { dni } : {}),
+      ...(cleanTags.length > 0 ? { tags: cleanTags } : {}),
+    };
+  };
+
+  /* 039 — Etiquetas del registro tal cual están en Airtable: estados de la
+   * póliza + forma de pago. El CRM las pinta con el color de la opción. */
+  const policyTags = (policy: PolicyCompact): string[] => [
+    ...policy.statuses,
+    ...(policy.payment ? [policy.payment] : []),
+  ];
 
   const clientProductsText = (clientId: string) =>
     [
@@ -1892,7 +1911,9 @@ export async function buildDashboard(
               ? ` (${daysText(days)})`
               : ""
           } · ${moneyText(policy.activePremium)}`,
-          policyLinksFor(policy.id, clientId)
+          policyLinksFor(policy.id, clientId),
+          undefined,
+          policyTags(policy)
         );
       }),
   });
@@ -2057,7 +2078,9 @@ export async function buildDashboard(
           policyLinksFor(
             policy.id,
             clientId
-          )
+          ),
+          undefined,
+          policyTags(policy)
         );
       }),
   });
@@ -2121,7 +2144,9 @@ export async function buildDashboard(
             } · ${policy.company || "—"} · ${moneyText(
               policy.activePremium
             )}`,
-            policyLinksFor(policy.id, clientId)
+            policyLinksFor(policy.id, clientId),
+            undefined,
+            policyTags(policy)
           );
         }),
     });

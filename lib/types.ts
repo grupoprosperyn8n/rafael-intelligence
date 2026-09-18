@@ -226,6 +226,12 @@ export type DrillItem = {
   detail?: string;
   extra?: string;
   links: DrillLink[];
+  /*
+   * 039 — Valores crudos de campos de selección de Airtable (estados de la
+   * póliza, forma de pago, …). El consumidor los pinta con el color real
+   * de la opción en Airtable (en el CRM: chips del Dashboard Management).
+   */
+  tags?: string[];
 };
 
 export type DrillList = {
