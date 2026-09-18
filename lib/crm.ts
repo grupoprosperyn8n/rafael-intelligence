@@ -49,6 +49,8 @@ const EMPTY_ANALYTICS: CrmAnalytics = {
     matchedPremium: 0,
     matchedWithActive: 0,
     expiring30: 0,
+    respondedRecently: 0,
+    noReply: 0,
   },
 
   channels: [],
@@ -82,6 +84,87 @@ export function loadCrmSnapshot(): CrmSnapshot | null {
   } catch {
     return null;
   }
+}
+
+/*
+ * Snapshot VIVO: cuando CRM_SNAPSHOT_URL está configurada, el cockpit baja
+ * el snapshot por HTTP desde el CRM (endpoint de solo lectura con API key),
+ * con cache en memoria (TTL 10 min) y fallback al archivo local (offline).
+ * El warm del tablero (?refresh=1) puede forzar la recarga.
+ */
+
+export type CrmLiveSnapshot = {
+  snapshot: CrmSnapshot;
+  via: "live" | "file";
+  fetchedAt: string;
+  ageMinutes: number;
+};
+
+let liveCache: { at: number; snapshot: CrmSnapshot } | null = null;
+
+export async function loadCrmSnapshotLive(
+  force = false
+): Promise<CrmLiveSnapshot | null> {
+  const url = process.env.CRM_SNAPSHOT_URL;
+  const key = process.env.CRM_SNAPSHOT_KEY;
+  const ttlMs = 10 * 60_000;
+
+  if (
+    url &&
+    (!liveCache || force || Date.now() - liveCache.at > ttlMs)
+  ) {
+    try {
+      const response = await fetch(url, {
+        headers: key ? { "x-api-key": key } : {},
+        cache: "no-store",
+        signal: AbortSignal.timeout(9000),
+      });
+
+      if (response.ok) {
+        const parsed = (await response.json()) as CrmSnapshot;
+
+        if (parsed && Array.isArray(parsed.contacts)) {
+          liveCache = { at: Date.now(), snapshot: parsed };
+        }
+      }
+    } catch {
+      /* Fallback: se sigue con el cache o el archivo local. */
+    }
+  }
+
+  if (liveCache) {
+    return {
+      snapshot: liveCache.snapshot,
+      via: "live",
+      fetchedAt: new Date(liveCache.at).toISOString(),
+      ageMinutes: Math.max(
+        0,
+        Math.round((Date.now() - liveCache.at) / 60000)
+      ),
+    };
+  }
+
+  const file = loadCrmSnapshot();
+
+  if (!file) {
+    return null;
+  }
+
+  const generated = file.generatedAt
+    ? new Date(file.generatedAt).getTime()
+    : NaN;
+
+  return {
+    snapshot: file,
+    via: "file",
+    fetchedAt: file.generatedAt || new Date().toISOString(),
+    ageMinutes: Number.isFinite(generated)
+      ? Math.max(
+          0,
+          Math.round((Date.now() - generated) / 60000)
+        )
+      : -1,
+  };
 }
 
 function daysUntil(date?: string): number | null {
@@ -182,6 +265,9 @@ export function buildCrmAnalytics(
     }
   >();
 
+  /* Último inbound REAL por contacto (para saber quién contesta). */
+  const lastInboundByContact = new Map<string, string>();
+
   realConversations.forEach((conversation) => {
     const stats =
       messagesByConversation.get(
@@ -200,6 +286,22 @@ export function buildCrmAnalytics(
 
     current.messages +=
       stats?.total || 0;
+
+    if (conversation.lastInboundAt) {
+      const previousInbound = lastInboundByContact.get(
+        conversation.contactId
+      );
+
+      if (
+        !previousInbound ||
+        conversation.lastInboundAt > previousInbound
+      ) {
+        lastInboundByContact.set(
+          conversation.contactId,
+          conversation.lastInboundAt
+        );
+      }
+    }
 
     const candidates = [
       conversation.lastMessageAt,
@@ -461,6 +563,15 @@ export function buildCrmAnalytics(
       const activity =
         activityByContact.get(contact.id);
 
+      const lastInboundAt =
+        lastInboundByContact.get(contact.id);
+
+      const responded30 = Boolean(
+        lastInboundAt &&
+          Date.now() - new Date(lastInboundAt).getTime() <=
+            30 * 86400000
+      );
+
       return {
         contactId: contact.id,
         name: contact.name || "(sin nombre)",
@@ -481,6 +592,9 @@ export function buildCrmAnalytics(
 
         historicalOperations:
           history?.operations || 0,
+
+        lastInboundAt,
+        responded30,
       };
     });
 
@@ -539,6 +653,82 @@ export function buildCrmAnalytics(
       b.activePremium - a.activePremium
   );
 
+  /*
+   * 8. Acciones disparadas desde el tablero (trazabilidad).
+   *
+   * El CRM registra cada vez que una sugerencia se convierte en acción
+   * (abrir chat con borrador, mandar mensaje). Acá se agregan por jugada
+   * para medir qué sugerencia mueve la aguja.
+   */
+
+  const ACTION_LABELS: Record<string, string> = {
+    renovaciones7: "Vencen ≤7 días",
+    renovaciones30: "Vencen ≤30 días",
+    reactivar: "Reactivación",
+    cross: "Sumar cobertura",
+    observar: "Retención a observar",
+    ficha: "Cliente 360°",
+  };
+
+  const actionRows = Array.isArray(snapshot.actions)
+    ? snapshot.actions
+    : [];
+
+  const actionCutoff = Date.now() - 30 * 86400000;
+
+  const recentActions = actionRows.filter(
+    (action) =>
+      action.createdAt &&
+      new Date(action.createdAt).getTime() >=
+        actionCutoff
+  );
+
+  const actionsByPlay = new Map<
+    string,
+    { sent: number; responded: number }
+  >();
+
+  recentActions.forEach((action) => {
+    const key =
+      action.playId || action.source || "otro";
+
+    const current = actionsByPlay.get(key) || {
+      sent: 0,
+      responded: 0,
+    };
+
+    current.sent += 1;
+
+    if (action.respondedAt) {
+      current.responded += 1;
+    }
+
+    actionsByPlay.set(key, current);
+  });
+
+  const respondedActions = recentActions.filter(
+    (action) => action.respondedAt
+  ).length;
+
+  const actions = {
+    total: actionRows.length,
+    windowDays: 30,
+    sent: recentActions.length,
+    responded: respondedActions,
+    rate: recentActions.length
+      ? respondedActions / recentActions.length
+      : 0,
+    byPlay: [...actionsByPlay.entries()]
+      .map(([key, values]) => ({
+        key,
+        label:
+          ACTION_LABELS[key] || "General",
+        sent: values.sent,
+        responded: values.responded,
+      }))
+      .sort((a, b) => b.sent - a.sent),
+  };
+
   return {
     available: true,
     generatedAt: snapshot.generatedAt,
@@ -573,6 +763,14 @@ export function buildCrmAnalytics(
       matchedPremium,
       matchedWithActive,
       expiring30,
+
+      respondedRecently: rows.filter(
+        (row) => row.responded30
+      ).length,
+
+      noReply: rows.filter(
+        (row) => row.messages > 0 && !row.lastInboundAt
+      ).length,
     },
 
     channels: [...channelCounts.entries()]
@@ -585,5 +783,7 @@ export function buildCrmAnalytics(
     pipeline,
     daily,
     rows: sortedRows,
+
+    actions,
   };
 }

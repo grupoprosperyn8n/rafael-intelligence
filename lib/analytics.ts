@@ -3,18 +3,21 @@ import { airtableTable } from "./airtable";
 
 import {
   ClientCompact,
+  CrmMatchRow,
   DashboardFilters,
   DashboardResponse,
   DrillItem,
   DrillLink,
   DrillList,
   HistoricCompact,
+  Playlist,
+  PlaylistItem,
   PolicyCompact,
 } from "./types";
 
 import {
   buildCrmAnalytics,
-  loadCrmSnapshot,
+  loadCrmSnapshotLive,
 } from "./crm";
 
 import {
@@ -1462,6 +1465,71 @@ export async function buildDashboard(
   const clientBackendUrl = (recordId: string) =>
     `https://airtable.com/${CONFIG.agentic.baseId}/${CONFIG.backoffice.clientsPage}/${recordId}`;
 
+  /*
+   * 14.a CRM VOCERO (snapshot VIVO, de SOLO LECTURA)
+   *
+   * El CRM se cruza EN MEMORIA contra la cartera, igual que las otras
+   * fuentes: no se mezclan bases, se superponen sobre los mismos ids.
+   * El snapshot se baja por HTTP desde el CRM (con fallback al archivo
+   * local) y su frescura viaja en la respuesta.
+   */
+
+  const crmResult = await loadCrmSnapshotLive(force);
+
+  const crm = buildCrmAnalytics(crmResult?.snapshot || null, {
+    clients,
+    phoneIndex,
+    nameIndex,
+    clientActivePolicies,
+    clientHistory,
+  });
+
+  if (crmResult) {
+    crm.snapshotSource = crmResult.via;
+    crm.snapshotAgeMinutes = crmResult.ageMinutes;
+  }
+
+  /*
+   * Actividad del CRM por cliente (la fila con más mensajes): alimenta el
+   * scoring del Cliente 360° y la nota de contacto de la Cola de hoy.
+   */
+  const crmActivityByClient = new Map<string, CrmMatchRow>();
+
+  crm.rows.forEach((row) => {
+    if (!row.clientId) return;
+
+    const previous = crmActivityByClient.get(
+      row.clientId
+    );
+
+    if (!previous || row.messages > previous.messages) {
+      crmActivityByClient.set(row.clientId, row);
+    }
+  });
+
+  const crmContactNote = (clientId?: string): string => {
+    if (!clientId) return "";
+
+    const activity = crmActivityByClient.get(clientId);
+
+    if (!activity?.responded30 || !activity.lastInboundAt) {
+      return "";
+    }
+
+    const days = Math.max(
+      0,
+      Math.round(
+        (Date.now() -
+          new Date(activity.lastInboundAt).getTime()) /
+          86400000
+      )
+    );
+
+    return days === 0
+      ? " · contestó recién"
+      : ` · contestó hace ${days} d`;
+  };
+
   const customer360 =
     selectedClients.map((client) => {
       const history =
@@ -1520,6 +1588,17 @@ export async function buildDashboard(
         historicProducts,
       });
 
+      const activityRow = crmActivityByClient.get(
+        client.id
+      );
+
+      const baseScore = scoreClient(metrics);
+
+      /* Si el cliente contesta por WhatsApp, eso es señal: +5. */
+      const score = activityRow?.responded30
+        ? Math.min(100, baseScore + 5)
+        : baseScore;
+
       return {
         id: client.id,
         name: client.name,
@@ -1543,8 +1622,7 @@ export async function buildDashboard(
 
         activePremium: premium,
 
-        score:
-          scoreClient(metrics),
+        score,
 
         recommendation,
 
@@ -1556,23 +1634,6 @@ export async function buildDashboard(
           clientBackendUrl(client.id),
       };
     });
-
-  /*
-   * 14.b CRM VOCERO (snapshot de SOLO LECTURA)
-   *
-   * El CRM se cruza EN MEMORIA contra la cartera, igual que las otras
-   * fuentes: no se mezclan bases, se superponen sobre los mismos ids.
-   */
-
-  const crmSnapshot = loadCrmSnapshot();
-
-  const crm = buildCrmAnalytics(crmSnapshot, {
-    clients,
-    phoneIndex,
-    nameIndex,
-    clientActivePolicies,
-    clientHistory,
-  });
 
   /*
    * 15. FILTROS DISPONIBLES
@@ -2831,6 +2892,325 @@ export async function buildDashboard(
     });
   }
 
+  /*
+   * 16. COLA DE HOY (playlists accionables)
+   *
+   * Cada jugada trae clientes reales listos para actuar desde el CRM:
+   * identidad (recordId / dni / telefono), lineas de detalle y el contexto
+   * que consume la IA del CRM para redactar el mensaje. El CRM la usa
+   * como pestana "Cola de hoy" y registra cada accion ejecutada.
+   */
+
+  const PLAY_CAP = 30;
+
+  const playlistItem = (
+    clientId: string | undefined,
+    fallbackName: string,
+    detail: string,
+    extra: string,
+    tags?: string[]
+  ): PlaylistItem | null => {
+    const client = clientId
+      ? listClientById.get(clientId)
+      : undefined;
+
+    const name = client?.name || fallbackName;
+
+    if (!name) {
+      return null;
+    }
+
+    const active = clientId
+      ? clientActivePolicies.get(clientId) || []
+      : [];
+
+    const history = clientId
+      ? clientHistory.get(clientId)
+      : undefined;
+
+    const premium = active.reduce(
+      (total, policy) =>
+        total + policy.activePremium,
+      0
+    );
+
+    const metrics = {
+      activePolicies: active.length,
+      historicAltas: history?.altas || 0,
+      historicAnulaciones:
+        history?.anulaciones || 0,
+      historicSiniestros:
+        history?.siniestros || 0,
+      activePremium: premium,
+    };
+
+    const recommendation =
+      recommendationForClient(metrics);
+
+    const activeProducts = [
+      ...new Set(
+        active
+          .map((policy) => policy.product)
+          .filter(
+            (value): value is string =>
+              Boolean(value)
+          )
+      ),
+    ].slice(0, 3);
+
+    const historicProducts = [
+      ...(history?.products || []),
+    ].slice(0, 3);
+
+    const plan = recommendationPlan({
+      recommendation,
+      activePolicies: metrics.activePolicies,
+      historicAltas: metrics.historicAltas,
+      historicAnulaciones:
+        metrics.historicAnulaciones,
+      historicSiniestros:
+        metrics.historicSiniestros,
+      activeProducts,
+      historicProducts,
+    });
+
+    return {
+      clientId: clientId || undefined,
+      name,
+      dni: client?.dni,
+      phone: client?.phone,
+      detail,
+      extra: `${extra}${crmContactNote(clientId)}`,
+      tags,
+      links: backendLinksFor(clientId),
+      context: {
+        name,
+        activePolicies: metrics.activePolicies,
+        historicalOperations:
+          history?.operations || 0,
+        historicalAltas: metrics.historicAltas,
+        historicalAnulaciones:
+          metrics.historicAnulaciones,
+        historicalSiniestros:
+          metrics.historicSiniestros,
+        activePremium: premium,
+        score: scoreClient(metrics),
+        recommendation,
+        recommendationWhy: plan.why,
+        recommendationSteps: plan.steps,
+      },
+    };
+  };
+
+  const asPlaylist = (
+    items: (PlaylistItem | null)[]
+  ): PlaylistItem[] =>
+    items.filter(
+      (item): item is PlaylistItem =>
+        Boolean(item)
+    );
+
+  const playlists: Playlist[] = [];
+
+  /* A. Renovaciones: vencen <=7 dias (hablar hoy). */
+  const renew7 = activePolicies
+    .filter((policy) => {
+      const days = daysUntil(policy.expiryDate);
+
+      return (
+        days !== null && days >= 0 && days <= 7
+      );
+    })
+    .sort((a, b) =>
+      (a.expiryDate || "").localeCompare(
+        b.expiryDate || ""
+      )
+    );
+
+  playlists.push({
+    id: "renovaciones7",
+    title: "Vencen en ≤7 días · hablá hoy",
+    subtitle:
+      "Pólizas activas al borde del vencimiento: la retención más barata.",
+    reason:
+      "Su póliza está por vencer: contactarlo ahora evita que se caiga la renovación.",
+    tone: "danger",
+    total: renew7.length,
+    items: asPlaylist(
+      renew7.slice(0, PLAY_CAP).map((policy) => {
+        const clientId = policy.clientIds[0];
+
+        const days = daysUntil(policy.expiryDate);
+
+        return playlistItem(
+          clientId,
+          "Cliente sin nombre",
+          `${policy.product || "—"} · Póliza ${
+            policy.number || "s/n"
+          }`,
+          `Vence ${dateText(policy.expiryDate)}${
+            days !== null ? ` (${daysText(days)})` : ""
+          } · ${policy.company || "—"} · ${moneyText(
+            policy.activePremium
+          )}`,
+          policyTags(policy)
+        );
+      })
+    ),
+  });
+
+  /* B. Renovaciones 8-30 días. */
+  const renew30 = activePolicies
+    .filter((policy) => {
+      const days = daysUntil(policy.expiryDate);
+
+      return (
+        days !== null && days > 7 && days <= 30
+      );
+    })
+    .sort((a, b) =>
+      (a.expiryDate || "").localeCompare(
+        b.expiryDate || ""
+      )
+    );
+
+  playlists.push({
+    id: "renovaciones30",
+    title: "Vencen en 8 a 30 días",
+    subtitle:
+      "Renovaciones del mes para agendar sin apuro.",
+    reason:
+      "Su póliza vence este mes: buen momento para adelantar el contacto y preparar la renovación.",
+    tone: "warning",
+    total: renew30.length,
+    items: asPlaylist(
+      renew30.slice(0, PLAY_CAP).map((policy) => {
+        const clientId = policy.clientIds[0];
+
+        const days = daysUntil(policy.expiryDate);
+
+        return playlistItem(
+          clientId,
+          "Cliente sin nombre",
+          `${policy.product || "—"} · Póliza ${
+            policy.number || "s/n"
+          }`,
+          `Vence ${dateText(policy.expiryDate)}${
+            days !== null ? ` (${daysText(days)})` : ""
+          } · ${policy.company || "—"} · ${moneyText(
+            policy.activePremium
+          )}`,
+          policyTags(policy)
+        );
+      })
+    ),
+  });
+
+  /* C. Reactivación: históricos valiosos sin póliza activa. */
+  playlists.push({
+    id: "reactivar",
+    title: "Reactivación",
+    subtitle:
+      "Ya fueron clientes y hoy no tienen póliza activa.",
+    reason:
+      "Registra historia comercial y hoy no tiene pólizas activas: recuperar a alguien que ya confió es la venta más fácil.",
+    tone: "warning",
+    total: reactivationCandidates,
+    items: asPlaylist(
+      reactivationList
+        .slice(0, PLAY_CAP)
+        .map(([clientId, history]) =>
+          playlistItem(
+            clientId,
+            "Cliente sin nombre",
+            `${history.operations} gestiones · ${
+              history.altas
+            } altas${
+              history.anulaciones
+                ? ` · ${history.anulaciones} anulaciones`
+                : ""
+            }`,
+            `Productos: ${clientProductsText(
+              clientId
+            )}`
+          )
+        )
+    ),
+  });
+
+  /* D. Venta cruzada: una sola póliza activa. */
+  playlists.push({
+    id: "cross",
+    title: "Sumar cobertura",
+    subtitle:
+      "Una sola póliza activa: relación viva y sin fricción.",
+    reason:
+      "Tiene exactamente una póliza activa: ofrecele sumar un producto complementario antes de la renovación.",
+    tone: "brand",
+    total: onePolicyClients,
+    items: asPlaylist(
+      onePolicyEntries
+        .slice(0, PLAY_CAP)
+        .map(([clientId, clientPolicies]) => {
+          const products = [
+            ...new Set(
+              clientPolicies
+                .map((policy) => policy.product)
+                .filter(Boolean)
+            ),
+          ];
+
+          return playlistItem(
+            clientId,
+            "Cliente sin nombre",
+            `Tiene: ${
+              products.join(", ") || "—"
+            } · 1 póliza activa`,
+            `Prima activa ${clientPremiumText(
+              clientId
+            )}`,
+            clientPolicies
+              .flatMap((policy) =>
+                policyTags(policy)
+              )
+              .slice(0, 4)
+          );
+        })
+    ),
+  });
+
+  /* E. Retención: con anulaciones y pólizas activas. */
+  playlists.push({
+    id: "observar",
+    title: "Retención a observar",
+    subtitle:
+      "Con pólizas activas pero anulaciones en la historia: riesgo latente.",
+    reason:
+      "Tiene pólizas activas pero también anulaciones en su historia: revisá retención y experiencia antes de que se caiga otra.",
+    tone: "warning",
+    total: retentionWatch,
+    items: asPlaylist(
+      watchers
+        .slice(0, PLAY_CAP)
+        .map(([clientId, history]) =>
+          playlistItem(
+            clientId,
+            "Cliente sin nombre",
+            `${clientActiveCount(
+              clientId
+            )} póliza(s) activa(s) · ${
+              history.anulaciones
+            } anulación(es)`,
+            `Productos: ${clientProductsText(
+              clientId
+            )} · Prima ${clientPremiumText(
+              clientId
+            )}`
+          )
+        )
+    ),
+  });
+
     /*
    * RESPUESTA
    */
@@ -3040,5 +3420,7 @@ export async function buildDashboard(
     crm,
 
     lists,
+
+    playlists,
   };
 }
