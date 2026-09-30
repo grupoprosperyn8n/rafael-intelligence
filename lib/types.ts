@@ -61,6 +61,9 @@ export type PolicyCompact = {
   premium: number;
   activePremium: number;
 
+  /* 045-B2 — Nivel IA del informe de la póliza (🟢/🟡/🔴), si existe. */
+  riskLevel?: string;
+
   createdTime?: string;
 };
 
@@ -121,6 +124,9 @@ export type DashboardResponse = {
     activeWithOnePolicy: number;
     retentionWatch: number;
     historicalWithoutCurrentPolicy: number;
+
+    /* 045-B2 — Clientes con perfil de riesgo IA generado. */
+    riskProfiled?: number;
   };
 
   monthly: {
@@ -192,6 +198,10 @@ export type DashboardResponse = {
     recommendationWhy: string;
     recommendationSteps: string[];
 
+    /* 045-B2 — Perfil de riesgo IA del cliente (texto + nivel). */
+    riskProfile?: string;
+    riskLevel?: string;
+
     backendUrl: string;
   }[];
 
@@ -201,6 +211,12 @@ export type DashboardResponse = {
   };
 
   crm: CrmAnalytics;
+
+  /* 045-B1 — Calidad y experiencia (calificaciones + denuncias con IA). */
+  quality?: QualityBlock;
+
+  /* 045-B3 — Equipo: productividad por empleado/oficina (info IA). */
+  team?: TeamBlock;
 
   /*
    * Cola de hoy: jugadas accionables calculadas por el motor de datos
@@ -532,4 +548,93 @@ export type Playlist = {
   tone: PlaylistTone;
   total: number;
   items: PlaylistItem[];
+};
+
+/*
+ * 045-B1 — MÓDULO CALIDAD Y EXPERIENCIA
+ * Encuestas de satisfacción (CALIFICACIONES: estrellas, comentarios y
+ * urgencia calculada por IA) y denuncias de siniestros (informe IA por
+ * caso). Datos reales de Airtable, solo lectura.
+ */
+
+export type QualityRatingRow = {
+  id: string;
+  date?: string;
+  stars?: number;
+  service?: string;
+  comment?: string;
+  urgency?: string;
+  employee?: string;
+  client?: string;
+};
+
+export type QualityClaimRow = {
+  id: string;
+  type: string;
+  date?: string;
+  client?: string;
+  office?: string;
+  culpability?: string;
+  report?: string;
+  status?: string;
+};
+
+export type QualityBlock = {
+  ratings: {
+    total: number;
+    average: number;
+    distribution: { stars: number; count: number }[];
+    urgencies: { name: string; count: number }[];
+    services: { name: string; average: number; count: number }[];
+    employees: { name: string; average: number; count: number }[];
+    latest: QualityRatingRow[];
+    low: number;
+    urgent: number;
+  };
+
+  claims: {
+    total: number;
+    byType: { name: string; count: number }[];
+    culpabilities: { name: string; count: number }[];
+    latest: QualityClaimRow[];
+  };
+};
+
+/*
+ * 045-B3 — MÓDULO EQUIPO
+ * Productividad por empleado y por oficina: comisiones y gestiones del
+ * sistema + el informe de productividad IA que ya genera el sistema.
+ */
+
+export type TeamEmployeeRow = {
+  id: string;
+  name: string;
+  gestionesMonth: number;
+  gestionesYear: number;
+  commissionMonth: number;
+  commissionYear: number;
+  report?: string;
+  reportLevel?: string;
+};
+
+export type TeamOfficeRow = {
+  id: string;
+  name: string;
+  gestionesMonth: number;
+  gestionesYear: number;
+  report?: string;
+  reportLevel?: string;
+};
+
+export type TeamBlock = {
+  employees: TeamEmployeeRow[];
+  offices: TeamOfficeRow[];
+  totals: {
+    employees: number;
+    gestionesMonth: number;
+    gestionesYear: number;
+    commissionMonth: number;
+    commissionYear: number;
+    reports: number;
+  };
 };

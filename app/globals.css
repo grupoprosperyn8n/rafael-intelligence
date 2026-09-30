@@ -2046,3 +2046,25 @@ footer {
 
   font-size: 12.5px;
 }
+
+/* ===== 045-B1 — Calidad y experiencia ===== */
+
+.quality-quote {
+  margin-top: 6px !important;
+
+  color: var(--text);
+
+  font-size: 13px;
+
+  line-height: 1.55;
+
+  font-style: italic;
+}
+
+.quality-urgent {
+  margin-top: 6px !important;
+
+  color: var(--danger, #d64545);
+
+  font-weight: 800;
+}

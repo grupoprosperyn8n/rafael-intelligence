@@ -43,6 +43,14 @@ export const CONFIG = {
       offices: "OFICINAS",
       prospects: "PROSPECTOS",
       quoteProspects: "PROSPECTOS MULTICOTIZADOR",
+
+      // 045-B1 — Calidad y experiencia: encuestas de satisfacción
+      // (con urgencia calculada por IA) y denuncias de siniestros
+      // (con informe IA por caso).
+      ratings: "CALIFICACIONES",
+      claimsAccident: "DENUNCIA DE ACCIDENTE",
+      claimsTheft: "DENUNCIA ROBO OC",
+      claimsFire: "DENUNCIA ROBO / INCENDIO",
     },
 
     clientFields: {
@@ -56,6 +64,8 @@ export const CONFIG = {
       activePolicies: "🟢 POLIZAS_ACTIVAS",
       policyCount: "✅ CANTIDAD_POLIZAS",
       activePremium: "PRIMA ACTIVA CLIENTE",
+      // 045-B2 — Perfil de riesgo IA del cliente (aiText de Airtable).
+      riskProfile: "PERFIL_DE_RIESGO_IA",
     },
 
     policyFields: {
@@ -72,6 +82,8 @@ export const CONFIG = {
       payment: "FORMA DE PAGOS",
       employee: "EMPLEADOS",
       office: "OFICINAS",
+      // 045-B2 — Informe IA de la póliza (aiText: estado operativo).
+      riskReport: "INFORME_POLIZA_IA",
     },
 
     productFields: {
@@ -80,6 +92,69 @@ export const CONFIG = {
 
     companyFields: {
       name: "NOMBRE",
+    },
+
+    /* 045-B3 — Campos de EMPLEADOS para el panel Equipo
+     * (informe IA + comisiones + gestiones del sistema). */
+    employeeFields: {
+      name: "NOMBRE Y APELLIDO",
+      report: "INFORME_PRODUCTIVIDAD",
+      commissionYear:
+        "💰✅ TOTAL COMISIÓN FINAL (de GESTION GENERAL) DEL AÑO",
+      commissionMonth:
+        "💰✅ TOTAL COMISIÓN FINAL (de GESTION GENERAL) MES EN CURSO",
+      countYear:
+        "Recuento (GESTION GENERAL) DEL AÑO",
+      countMonth:
+        "Recuento (GESTION GENERAL)  MES EN CUSRSO",
+    },
+
+    /* 045-B3 — Campos de OFICINAS para el panel Equipo. */
+    officeTeamFields: {
+      name: "OFICINAS",
+      report: "INFORME_PRODUCTIVIDAD_OFICINA",
+      countYear:
+        "CANTIDAD DE GESTIONES GENERALES ANUAL",
+      countMonth:
+        "CANTIDAD DE GESTIONES GENERALES MENSUAL",
+    },
+
+    /* 045-B1 — Campos de CALIFICACIONES (encuesta post-atención). */
+    ratingFields: {
+      stars: "ESTRELLAS",
+      service: "SERVICIO",
+      comment: "COMENTARIO",
+      urgency: "URGENCIA DE ATENCION (AI)",
+      employee: "EMPLEADO",
+      clientName: "NOMBRE",
+      date: "FECHA DE CREACION",
+      mode: "MODO",
+    },
+
+    /* 045-B1 — Campos de las denuncias (informe IA por caso). */
+    claimFields: {
+      date: "FECHA DE CREACION",
+      office: "OFICINAS",
+      client: "CLIENTE",
+      report: "INFORME_DENUNCIA_ACCIDENTE",
+      status: "Estado del trámite",
+      culpability: "CULPABILIDAD IA",
+    },
+
+    theftClaimFields: {
+      date: "FECHA DE CREACION",
+      office: "OFICINAS",
+      client: "CLIENTE",
+      report: "INFORME_ROBO_OC",
+      status: "Estado del trámite",
+    },
+
+    fireClaimFields: {
+      date: "FECHA DE CREACION",
+      office: "OFICINAS",
+      client: "CLIENTE",
+      report: "INFORME_ROBO/INCENDIO",
+      status: "ESTADO DEL RECLAMO",
     },
   },
 

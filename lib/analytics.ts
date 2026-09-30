@@ -2,6 +2,7 @@ import { CONFIG } from "./config";
 import { airtableTable } from "./airtable";
 
 import {
+  AirtableRecord,
   ClientCompact,
   CrmMatchRow,
   DashboardFilters,
@@ -13,6 +14,10 @@ import {
   Playlist,
   PlaylistItem,
   PolicyCompact,
+  QualityBlock,
+  TeamBlock,
+  TeamEmployeeRow,
+  TeamOfficeRow,
 } from "./types";
 
 import {
@@ -40,6 +45,71 @@ function text(value: any): string {
   if (value === null || value === undefined) return "";
 
   return String(value);
+}
+
+/*
+ * 045-B2 — Campos de IA de Airtable (aiText): llegan como objeto
+ * { state, value } donde value guarda el texto generado. Devuelve el
+ * texto cuando existe; vacío si la IA todavía no lo generó o falló.
+ */
+function aiText(value: any): string {
+  if (!value) return "";
+
+  if (typeof value === "object") {
+    if (typeof value.value === "string") return value.value;
+
+    if (
+      value.value === null ||
+      value.value === undefined
+    ) {
+      return "";
+    }
+
+    return String(value.value);
+  }
+
+  return String(value);
+}
+
+/*
+ * 045-B2 — Nivel del semáforo IA del texto (🟢 Bajo · 🟡 Medio ·
+ * 🔴 Alto) para resumir perfiles e informes en una etiqueta corta.
+ *
+ * Informes de póliza: el nivel es el del "🚦 ESTADO OPERATIVO"
+ * (viene al inicio, en la línea siguiente al rótulo). Perfiles y
+ * otros textos: el primer semáforo del texto es el nivel.
+ */
+function aiLevel(value: any): string {
+  const raw = aiText(value);
+
+  if (!raw) return "";
+
+  const label = (emoji: string) =>
+    emoji === "🔴"
+      ? "🔴 Alto"
+      : emoji === "🟠"
+      ? "🟠 Seguimiento"
+      : emoji === "🟡"
+      ? "🟡 Medio"
+      : "🟢 Bajo";
+
+  const operativo = raw.match(
+    /ESTADO OPERATIVO[\s\S]{0,30}?(🔴|🟠|🟡|🟢)/
+  );
+
+  if (operativo) return label(operativo[1]);
+
+  const productividad = raw.match(
+    /NIVEL DE PRODUCTIVIDAD[\s\S]{0,30}?(🔴|🟠|🟡|🟢)/
+  );
+
+  if (productividad) return label(productividad[1]);
+
+  const first = raw.match(/🔴|🟠|🟡|🟢/);
+
+  if (first) return label(first[0]);
+
+  return "";
 }
 
 function statusArray(value: any): string[] {
@@ -295,6 +365,359 @@ function scoreClient(args: {
   return Math.min(100, score);
 }
 
+/* =====================================================================
+ * 045-B1 — CALIDAD Y EXPERIENCIA
+ * Encuestas de satisfacción (CALIFICACIONES: estrellas, comentarios y
+ * urgencia calculada por IA) y denuncias de siniestros (informe IA por
+ * caso). Todo tolerante a tablas vacías: los números aparecen solos a
+ * medida que el sistema carga registros.
+ * =================================================================== */
+
+type QualityClaimFieldMap = {
+  date: string;
+  office: string;
+  client: string;
+  report: string;
+  status: string;
+  culpability?: string;
+};
+
+function buildQualityBlock(args: {
+  ratings: AirtableRecord[];
+  claims: {
+    type: string;
+    records: AirtableRecord[];
+    fields: QualityClaimFieldMap;
+  }[];
+  ratingFields: Record<string, string>;
+  employeeNames: Map<string, string>;
+}): QualityBlock {
+  const {
+    ratings,
+    claims,
+    ratingFields,
+    employeeNames,
+  } = args;
+
+  const employeeOf = (record: AirtableRecord) => {
+    const raw = record.fields[ratingFields.employee];
+
+    if (Array.isArray(raw)) {
+      const id = raw[0];
+
+      return typeof id === "string"
+        ? employeeNames.get(id) || ""
+        : "";
+    }
+
+    return text(raw);
+  };
+
+  const parsed = ratings
+    .map((record) => {
+      const stars = Number(
+        record.fields[ratingFields.stars]
+      );
+
+      return {
+        id: record.id,
+        date:
+          text(record.fields[ratingFields.date]) ||
+          undefined,
+        stars:
+          Number.isFinite(stars) && stars > 0
+            ? stars
+            : undefined,
+        service:
+          text(
+            record.fields[ratingFields.service]
+          ) || undefined,
+        comment:
+          text(
+            record.fields[ratingFields.comment]
+          ) || undefined,
+        urgency:
+          text(
+            record.fields[ratingFields.urgency]
+          ) || undefined,
+        employee: employeeOf(record) || undefined,
+        client:
+          text(
+            record.fields[ratingFields.clientName]
+          ) || undefined,
+      };
+    })
+    .sort((a, b) =>
+      (b.date || "").localeCompare(a.date || "")
+    );
+
+  const withStars = parsed.filter(
+    (row) => typeof row.stars === "number"
+  );
+
+  const average = withStars.length
+    ? withStars.reduce(
+        (acc, row) => acc + (row.stars || 0),
+        0
+      ) / withStars.length
+    : 0;
+
+  const distribution = [1, 2, 3, 4, 5].map(
+    (stars) => ({
+      stars,
+      count: withStars.filter(
+        (row) => row.stars === stars
+      ).length,
+    })
+  );
+
+  const countBy = (
+    values: (string | undefined)[]
+  ) => {
+    const map = new Map<string, number>();
+
+    values.forEach((value) => {
+      if (!value) return;
+
+      map.set(value, (map.get(value) || 0) + 1);
+    });
+
+    return [...map.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  const avgBy = (
+    pick: (
+      row: (typeof parsed)[number]
+    ) => string | undefined
+  ) => {
+    const map = new Map<
+      string,
+      { sum: number; count: number }
+    >();
+
+    withStars.forEach((row) => {
+      const key = pick(row);
+
+      if (!key) return;
+
+      const entry = map.get(key) || {
+        sum: 0,
+        count: 0,
+      };
+
+      entry.sum += row.stars || 0;
+      entry.count += 1;
+      map.set(key, entry);
+    });
+
+    return [...map.entries()]
+      .map(([name, value]) => ({
+        name,
+        average: value.count
+          ? value.sum / value.count
+          : 0,
+        count: value.count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  const urgent = parsed.filter(
+    (row) =>
+      !!row.urgency &&
+      /urgente|próximo|proximo|contactar|seguimiento|pendiente/i.test(
+        row.urgency
+      )
+  ).length;
+
+  const claimsFlat = claims
+    .flatMap((group) =>
+      group.records.map((record) => ({
+        id: record.id,
+        type: group.type,
+        date:
+          text(record.fields[group.fields.date]) ||
+          undefined,
+        client:
+          text(record.fields[group.fields.client]) ||
+          undefined,
+        office:
+          text(record.fields[group.fields.office]) ||
+          undefined,
+        culpability: group.fields.culpability
+          ? text(
+              record.fields[
+                group.fields.culpability
+              ]
+            ) || undefined
+          : undefined,
+        report:
+          text(record.fields[group.fields.report]) ||
+          undefined,
+        status:
+          text(record.fields[group.fields.status]) ||
+          undefined,
+      }))
+    )
+    .sort((a, b) =>
+      (b.date || "").localeCompare(a.date || "")
+    );
+
+  return {
+    ratings: {
+      total: parsed.length,
+      average,
+      distribution,
+      urgencies: countBy(
+        parsed.map((row) => row.urgency)
+      ),
+      services: avgBy((row) => row.service),
+      employees: avgBy((row) => row.employee),
+      latest: parsed.slice(0, 12),
+      low: withStars.filter(
+        (row) => (row.stars || 0) <= 3
+      ).length,
+      urgent,
+    },
+
+    claims: {
+      total: claimsFlat.length,
+      byType: countBy(
+        claimsFlat.map((row) => row.type)
+      ),
+      culpabilities: countBy(
+        claimsFlat.map((row) => row.culpability)
+      ),
+      latest: claimsFlat.slice(0, 8),
+    },
+  };
+}
+
+/* =====================================================================
+ * 045-B3 — EQUIPO
+ * Productividad por empleado y oficina: gestiones y comisiones del
+ * sistema + el informe de productividad IA (cuando ya está generado).
+ * =================================================================== */
+
+function buildTeamBlock(args: {
+  employees: AirtableRecord[];
+  offices: AirtableRecord[];
+  employeeFields: Record<string, string>;
+  officeFields: Record<string, string>;
+}): TeamBlock {
+  const {
+    employees,
+    offices,
+    employeeFields,
+    officeFields,
+  } = args;
+
+  const employeeRows: TeamEmployeeRow[] = employees
+    .filter((record) => !record.fields.BAJA)
+    .map((record) => {
+      const report = aiText(
+        record.fields[employeeFields.report]
+      ).trim();
+
+      return {
+        id: record.id,
+        name:
+          text(
+            record.fields[employeeFields.name]
+          ).trim() || "Empleado sin nombre",
+        gestionesMonth: numberValue(
+          record.fields[employeeFields.countMonth]
+        ),
+        gestionesYear: numberValue(
+          record.fields[employeeFields.countYear]
+        ),
+        commissionMonth: numberValue(
+          record.fields[
+            employeeFields.commissionMonth
+          ]
+        ),
+        commissionYear: numberValue(
+          record.fields[
+            employeeFields.commissionYear
+          ]
+        ),
+        report: report || undefined,
+        reportLevel:
+          aiLevel(report) || undefined,
+      };
+    })
+    .filter(
+      (row) =>
+        row.gestionesYear > 0 ||
+        row.commissionYear > 0 ||
+        !!row.report
+    )
+    .sort(
+      (a, b) =>
+        b.commissionYear - a.commissionYear ||
+        b.gestionesYear - a.gestionesYear
+    );
+
+  const officeRows: TeamOfficeRow[] = offices
+    .map((record) => {
+      const report = aiText(
+        record.fields[officeFields.report]
+      ).trim();
+
+      return {
+        id: record.id,
+        name:
+          text(
+            record.fields[officeFields.name]
+          ).trim() || "Oficina sin nombre",
+        gestionesMonth: numberValue(
+          record.fields[officeFields.countMonth]
+        ),
+        gestionesYear: numberValue(
+          record.fields[officeFields.countYear]
+        ),
+        report: report || undefined,
+        reportLevel:
+          aiLevel(report) || undefined,
+      };
+    })
+    .filter(
+      (row) => row.gestionesYear > 0 || !!row.report
+    )
+    .sort(
+      (a, b) => b.gestionesYear - a.gestionesYear
+    );
+
+  return {
+    employees: employeeRows,
+    offices: officeRows,
+
+    totals: {
+      employees: employeeRows.length,
+      gestionesMonth: employeeRows.reduce(
+        (acc, row) => acc + row.gestionesMonth,
+        0
+      ),
+      gestionesYear: employeeRows.reduce(
+        (acc, row) => acc + row.gestionesYear,
+        0
+      ),
+      commissionMonth: employeeRows.reduce(
+        (acc, row) => acc + row.commissionMonth,
+        0
+      ),
+      commissionYear: employeeRows.reduce(
+        (acc, row) => acc + row.commissionYear,
+        0
+      ),
+      reports: employeeRows.filter(
+        (row) => !!row.report
+      ).length,
+    },
+  };
+}
+
 export async function buildDashboard(
   filters: DashboardFilters = {}
 ): Promise<DashboardResponse> {
@@ -322,6 +745,10 @@ export async function buildDashboard(
     rawOffices,
     rawHistoricEmployees,
     rawHistoricRecords,
+    rawRatings,
+    rawClaimsAccident,
+    rawClaimsTheft,
+    rawClaimsFire,
   ] = await Promise.all([
     airtableTable(
       agenticConfig.baseId,
@@ -380,6 +807,37 @@ export async function buildDashboard(
       historicConfig.baseId,
       historicConfig.tables.management,
       Object.values(historicConfig.fields),
+      { force }
+    ),
+
+    // 045-B1 — Calidad y experiencia: CALIFICACIONES (encuestas con
+    // urgencia calculada por IA) y las tres tablas de denuncias
+    // (informe IA por caso). Tablas chicas: en paralelo con el resto.
+    airtableTable(
+      agenticConfig.baseId,
+      agenticConfig.tables.ratings,
+      Object.values(agenticConfig.ratingFields),
+      { force }
+    ),
+
+    airtableTable(
+      agenticConfig.baseId,
+      agenticConfig.tables.claimsAccident,
+      Object.values(agenticConfig.claimFields),
+      { force }
+    ),
+
+    airtableTable(
+      agenticConfig.baseId,
+      agenticConfig.tables.claimsTheft,
+      Object.values(agenticConfig.theftClaimFields),
+      { force }
+    ),
+
+    airtableTable(
+      agenticConfig.baseId,
+      agenticConfig.tables.claimsFire,
+      Object.values(agenticConfig.fireClaimFields),
       { force }
     ),
   ]);
@@ -448,6 +906,32 @@ export async function buildDashboard(
   /*
    * 3. CLIENTES MAESTROS
    */
+
+  /*
+   * 045-B2 — Perfil de riesgo IA por cliente (CLIENTES.PERFIL_DE_RIESGO_IA):
+   * solo cuenta cuando la IA ya generó el texto. Se usa para priorizar
+   * la lista de retención y mostrar el perfil en el Cliente 360°.
+   */
+  const clientRisk = new Map<
+    string,
+    { level: string; summary: string }
+  >();
+
+  rawClients.forEach((record) => {
+    const value =
+      record.fields[
+        agenticConfig.clientFields.riskProfile
+      ];
+
+    const summary = aiText(value).trim();
+
+    if (!summary) return;
+
+    clientRisk.set(record.id, {
+      level: aiLevel(value),
+      summary,
+    });
+  });
 
   const clients: ClientCompact[] =
     rawClients.map((record) => ({
@@ -653,6 +1137,15 @@ export async function buildDashboard(
               .activePremium
           ]
         ),
+
+        // 045-B2 — Nivel IA del informe de la póliza (🟢/🟡/🔴).
+        riskLevel:
+          aiLevel(
+            fields[
+              agenticConfig.policyFields
+                .riskReport
+            ]
+          ) || undefined,
 
         createdTime: record.createdTime,
       };
@@ -1630,6 +2123,13 @@ export async function buildDashboard(
 
         recommendationSteps: plan.steps,
 
+        // 045-B2 — Perfil de riesgo IA (texto + nivel) del cliente.
+        riskProfile:
+          clientRisk.get(client.id)?.summary,
+        riskLevel:
+          clientRisk.get(client.id)?.level ||
+          undefined,
+
         backendUrl:
           clientBackendUrl(client.id),
       };
@@ -2188,6 +2688,11 @@ export async function buildDashboard(
             policy.expiryDate
           );
 
+          // 045-B2 — Riesgo IA del cliente y nivel IA de la póliza.
+          const risk = clientId
+            ? clientRisk.get(clientId)
+            : undefined;
+
           return drillItem(
             clientId
               ? listClientById.get(clientId)?.name ||
@@ -2204,7 +2709,15 @@ export async function buildDashboard(
                 : ""
             } · ${policy.company || "—"} · ${moneyText(
               policy.activePremium
-            )}`,
+            )}${
+              risk?.level
+                ? ` · Cliente IA ${risk.level}`
+                : ""
+            }${
+              policy.riskLevel
+                ? ` · Póliza IA ${policy.riskLevel}`
+                : ""
+            }`,
             policyLinksFor(policy.id, clientId),
             undefined,
             policyTags(policy)
@@ -2250,6 +2763,9 @@ export async function buildDashboard(
         const client =
           listClientById.get(clientId);
 
+        // 045-B2 — Riesgo IA del cliente a observar.
+        const risk = clientRisk.get(clientId);
+
         return drillItem(
           client?.name || "Cliente sin nombre",
           `${clientActiveCount(
@@ -2261,7 +2777,11 @@ export async function buildDashboard(
             clientId
           )} · Prima ${clientPremiumText(
             clientId
-          )}`,
+          )}${
+            risk?.level
+              ? ` · Riesgo IA ${risk.level}`
+              : ""
+          }`,
           backendLinksFor(clientId),
           client?.dni
         );
@@ -3215,6 +3735,38 @@ export async function buildDashboard(
    * RESPUESTA
    */
 
+  // 045-B1 — Calidad y experiencia (encuestas + denuncias).
+  const quality = buildQualityBlock({
+    ratings: rawRatings,
+    claims: [
+      {
+        type: "Accidente",
+        records: rawClaimsAccident,
+        fields: agenticConfig.claimFields,
+      },
+      {
+        type: "Robo (OC)",
+        records: rawClaimsTheft,
+        fields: agenticConfig.theftClaimFields,
+      },
+      {
+        type: "Robo / Incendio",
+        records: rawClaimsFire,
+        fields: agenticConfig.fireClaimFields,
+      },
+    ],
+    ratingFields: agenticConfig.ratingFields,
+    employeeNames,
+  });
+
+  // 045-B3 — Equipo: productividad por empleado/oficina.
+  const team = buildTeamBlock({
+    employees: rawEmployees,
+    offices: rawOffices,
+    employeeFields: agenticConfig.employeeFields,
+    officeFields: agenticConfig.officeTeamFields,
+  });
+
   return {
     generatedAt:
       new Date().toISOString(),
@@ -3301,6 +3853,9 @@ export async function buildDashboard(
       retentionWatch,
 
       historicalWithoutCurrentPolicy,
+
+      // 045-B2 — Clientes con perfil de riesgo IA generado.
+      riskProfiled: clientRisk.size,
     },
 
     monthly: [
@@ -3418,6 +3973,10 @@ export async function buildDashboard(
     customerStats,
 
     crm,
+
+    quality,
+
+    team,
 
     lists,
 

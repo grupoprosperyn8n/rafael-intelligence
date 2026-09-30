@@ -6,6 +6,8 @@ export type TabId =
   | "cross"
   | "clientes"
   | "crm"
+  | "calidad"
+  | "equipo"
   | "migracion";
 
 export type HelpAction =
@@ -234,6 +236,71 @@ export const MODULE_HELP: Record<
       {
         text: "Ver quién está listo para ofrecerle algo → Venta cruzada",
         action: { kind: "goto", tab: "cross" },
+      },
+    ],
+  },
+
+  /* 045-B1 — Calidad y experiencia: encuestas + denuncias con IA. */
+  calidad: {
+    title: "Calidad y experiencia",
+    tagline:
+      "La voz del cliente: encuestas, urgencias y denuncias — con la lectura de la IA.",
+    what: [
+      "Las encuestas post-atención reales: estrellas, comentarios y el servicio que eligió cada cliente.",
+      "Cada respuesta trae la URGENCIA DE ATENCION calculada por IA (desde «calificación cerrada» hasta «atender urgente»): la IA te dice a quién llamar.",
+      "Las denuncias de siniestros (accidente, robo) con su informe IA por caso y la culpabilidad analizada.",
+    ],
+    measures: [
+      "Promedio de satisfacción (1 a 5 estrellas) y reparto de las calificaciones.",
+      "Cuántas respuestas piden contacto (urgencia IA) y cuántas quedan cerradas.",
+      "Satisfacción por empleado y por servicio; denuncias por tipo y culpabilidad IA.",
+    ],
+    usage: [
+      "Empezá por «Para contactar ya»: son los clientes que la IA marca para seguimiento.",
+      "Mirá satisfacción por empleado/servicio para detectar dónde mejorar la atención.",
+      "El detalle de cada encuesta (comentario real) está en las tarjetas del final.",
+    ],
+    suggestions: [
+      {
+        text: "Ver la cartera que hay que proteger → Retención",
+        action: { kind: "goto", tab: "retencion" },
+      },
+      {
+        text: "Ver el CRM · Venta y gestión",
+        action: { kind: "goto", tab: "crm" },
+      },
+    ],
+  },
+
+  /* 045-B3 — Equipo: productividad por empleado/oficina. */
+  equipo: {
+    title: "Equipo",
+    tagline:
+      "Quién mueve la agencia: gestiones, comisiones y el informe de productividad que ya genera la IA.",
+    what: [
+      "Rendimiento por empleado con comisiones del mes y del año (dato real del sistema de seguros) más el informe de productividad IA.",
+      "Productividad por oficina con gestiones anuales e informe IA por sucursal.",
+      "Cobertura de informes: cuántos empleados ya tienen su informe IA generado.",
+    ],
+    measures: [
+      "Empleados con actividad: activos con gestiones o comisiones; excluye bajas.",
+      "Gestiones: conteo real de GESTION GENERAL por empleado/oficina (mes y año).",
+      "Comisiones: 💰✅ TOTAL COMISIÓN FINAL (rollup del sistema, mes en curso y año).",
+      "Informe IA: INFORME_PRODUCTIVIDAD del empleado / INFORME_PRODUCTIVIDAD_OFICINA de la oficina.",
+    ],
+    usage: [
+      "Usá el panel para conversaciones de desempeño y para detectar oficinas que necesitan apoyo.",
+      "Compará comisiones del mes contra gestiones: productividad real, no solo volumen.",
+      "Leé el informe IA de cada persona antes de reuniones de equipo.",
+    ],
+    suggestions: [
+      {
+        text: "Ver qué clientes proteger → Retención",
+        action: { kind: "goto", tab: "retencion" },
+      },
+      {
+        text: "Ver la satisfacción de los clientes → Calidad",
+        action: { kind: "goto", tab: "calidad" },
       },
     ],
   },

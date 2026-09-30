@@ -44,6 +44,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Star,
   Target,
   TrendingUp,
   UserRoundCheck,
@@ -80,6 +81,8 @@ type Tab =
   | "cross"
   | "clientes"
   | "crm"
+  | "calidad"
+  | "equipo"
   | "migracion";
 
 function money(value: number) {
@@ -1805,6 +1808,16 @@ export default function ExecutiveDashboard() {
               MessageSquareText,
             ],
             [
+              "calidad",
+              "Calidad y experiencia",
+              Star,
+            ],
+            [
+              "equipo",
+              "Equipo",
+              Users,
+            ],
+            [
               "migracion",
               "Calidad de datos",
               Database,
@@ -2797,6 +2810,17 @@ export default function ExecutiveDashboard() {
                 }
                 icon={<Activity />}
               />
+
+              {/* 045-B2 — Cobertura del perfil de riesgo IA. */}
+              <Kpi
+                title="Perfil de riesgo IA"
+                value={number(
+                  data.opportunity
+                    .riskProfiled || 0
+                )}
+                subtitle="Clientes con análisis IA de riesgo cargado"
+                icon={<ShieldCheck />}
+              />
             </section>
 
             <Section
@@ -3273,6 +3297,24 @@ export default function ExecutiveDashboard() {
                               )}
                             </ul>
                           )}
+                        </>
+                      )}
+
+                      {customer.riskProfile && (
+                        <>
+                          <span>
+                            Perfil de riesgo IA
+                          </span>
+
+                          {customer.riskLevel && (
+                            <strong>
+                              {customer.riskLevel}
+                            </strong>
+                          )}
+
+                          <p className="reco-why">
+                            {customer.riskProfile}
+                          </p>
                         </>
                       )}
 
@@ -4171,6 +4213,614 @@ export default function ExecutiveDashboard() {
                 </Section>
               </>
             )}
+          </>
+        )}
+
+        {/*
+         * 045-B1 — Calidad y experiencia: encuestas de satisfacción
+         * (con urgencia IA) y denuncias de siniestros (informe IA).
+         */}
+        {tab === "calidad" && (
+          <>
+            <HelpZone
+              help={MODULE_HELP.calidad}
+              id="calidad"
+              onAction={applyHelpAction}
+            />
+
+            {(() => {
+              const quality = data.quality;
+              const ratings = quality?.ratings;
+              const claims = quality?.claims;
+
+              return (
+                <>
+                  <section className="kpi-grid">
+                    <Kpi
+                      title="Calificaciones"
+                      value={number(
+                        ratings?.total || 0
+                      )}
+                      subtitle="Encuestas post-atención · Airtable CALIFICACIONES"
+                      icon={<Star size={20} />}
+                    />
+
+                    <Kpi
+                      title="Satisfacción promedio"
+                      value={
+                        ratings?.average
+                          ? `${ratings.average.toFixed(
+                              1
+                            )} ★`
+                          : "—"
+                      }
+                      subtitle="Promedio de estrellas (1 a 5)"
+                      tone={
+                        !ratings?.average
+                          ? "default"
+                          : ratings.average >= 4
+                          ? "success"
+                          : ratings.average >= 3
+                          ? "warning"
+                          : "danger"
+                      }
+                      icon={<TrendingUp size={20} />}
+                    />
+
+                    <Kpi
+                      title="Para contactar ya"
+                      value={number(
+                        ratings?.urgent || 0
+                      )}
+                      subtitle="Urgencia IA: próximo a contactar o urgente"
+                      tone={
+                        ratings?.urgent
+                          ? "danger"
+                          : "default"
+                      }
+                      icon={
+                        <AlertTriangle size={20} />
+                      }
+                    />
+
+                    <Kpi
+                      title="Denuncias"
+                      value={number(
+                        claims?.total || 0
+                      )}
+                      subtitle="Siniestros con informe IA por caso"
+                      icon={
+                        <ShieldCheck size={20} />
+                      }
+                    />
+                  </section>
+
+                  <div className="two-columns">
+                    <Section
+                      title="Estrellas recibidas"
+                      subtitle="Reparto de las encuestas · dato real de CALIFICACIONES"
+                    >
+                      <div className="chart-large">
+                        <ResponsiveContainer>
+                          <BarChart
+                            data={
+                              ratings?.distribution ||
+                              []
+                            }
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+
+                            <XAxis
+                              dataKey="stars"
+                              tickFormatter={(
+                                value: any
+                              ) => `${value} ★`}
+                            />
+
+                            <YAxis
+                              allowDecimals={false}
+                            />
+
+                            <Tooltip
+                              formatter={(
+                                value: any
+                              ) => [
+                                value,
+                                "Encuestas",
+                              ]}
+                              labelFormatter={(
+                                label: any
+                              ) =>
+                                `${label} estrellas`
+                              }
+                            />
+
+                            <Bar
+                              dataKey="count"
+                              radius={[6, 6, 0, 0]}
+                              fill="#0d5bff"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Section>
+
+                    <Section
+                      title="Urgencia IA de cada respuesta"
+                      subtitle="URGENCIA DE ATENCION (AI) — qué indica hacer la IA"
+                    >
+                      {ratings?.urgencies.length ? (
+                        <div className="opportunity-list">
+                          {ratings.urgencies.map(
+                            (item) => (
+                              <div
+                                className="opportunity-row"
+                                key={item.name}
+                              >
+                                <strong>
+                                  {item.name}
+                                </strong>
+
+                                <div className="opportunity-value">
+                                  {number(
+                                    item.count
+                                  )}{" "}
+                                  encuestas
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <div className="empty-state">
+                          Todavía sin clasificaciones de
+                          urgencia. Aparecen a medida que
+                          la IA procesa las encuestas.
+                        </div>
+                      )}
+                    </Section>
+                  </div>
+
+                  <div className="two-columns">
+                    <Section
+                      title="Satisfacción por empleado"
+                      subtitle="Promedio de estrellas por quién atendió · fuente EMPLEADO"
+                    >
+                      {ratings?.employees.length ? (
+                        <div className="opportunity-list">
+                          {ratings.employees.map(
+                            (item) => (
+                              <div
+                                className="opportunity-row"
+                                key={item.name}
+                              >
+                                <strong>
+                                  {item.name}
+                                </strong>
+
+                                <div className="opportunity-value">
+                                  {item.average.toFixed(
+                                    1
+                                  )}{" "}
+                                  ★
+                                </div>
+
+                                <span>
+                                  {number(item.count)}{" "}
+                                  encuestas
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <div className="empty-state">
+                          Sin datos por empleado todavía.
+                        </div>
+                      )}
+                    </Section>
+
+                    <Section
+                      title="Satisfacción por servicio"
+                      subtitle="Promedio de estrellas por tipo de atención · fuente SERVICIO"
+                    >
+                      {ratings?.services.length ? (
+                        <div className="opportunity-list">
+                          {ratings.services.map(
+                            (item) => (
+                              <div
+                                className="opportunity-row"
+                                key={item.name}
+                              >
+                                <strong>
+                                  {item.name}
+                                </strong>
+
+                                <div className="opportunity-value">
+                                  {item.average.toFixed(
+                                    1
+                                  )}{" "}
+                                  ★
+                                </div>
+
+                                <span>
+                                  {number(item.count)}{" "}
+                                  encuestas
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <div className="empty-state">
+                          Sin datos por servicio todavía.
+                        </div>
+                      )}
+                    </Section>
+                  </div>
+
+                  <Section
+                    title="Últimas respuestas de los clientes"
+                    subtitle="Comentario real · quién atendió · urgencia IA"
+                  >
+                    {ratings?.latest.length ? (
+                      <div className="action-grid">
+                        {ratings.latest.map((row) => (
+                          <article
+                            className="action-card"
+                            key={row.id}
+                          >
+                            <div>
+                              <strong>
+                                {row.stars
+                                  ? `${row.stars} ★`
+                                  : "Sin estrellas"}
+
+                                {row.service
+                                  ? ` · ${row.service}`
+                                  : ""}
+                              </strong>
+
+                              <span>
+                                {[
+                                  row.employee,
+                                  row.client,
+                                  row.date
+                                    ? new Date(
+                                        row.date
+                                      ).toLocaleDateString(
+                                        "es-AR"
+                                      )
+                                    : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+
+                              {row.comment && (
+                                <span className="quality-quote">
+                                  “{row.comment}”
+                                </span>
+                              )}
+
+                              {row.urgency && (
+                                <span className="quality-urgent">
+                                  {row.urgency}
+                                </span>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        Aún no hay encuestas respondidas.
+                      </div>
+                    )}
+                  </Section>
+
+                  <Section
+                    title="Denuncias de siniestros"
+                    subtitle="Cada caso con su informe IA y la culpabilidad analizada · solo lectura"
+                  >
+                    {claims?.total ? (
+                      <>
+                        <div className="action-grid">
+                          {claims.byType.map(
+                            (item) => (
+                              <article
+                                className="action-card"
+                                key={item.name}
+                              >
+                                <div>
+                                  <strong>
+                                    {item.name}
+                                  </strong>
+
+                                  <span>
+                                    {number(item.count)}{" "}
+                                    casos
+                                  </span>
+                                </div>
+                              </article>
+                            )
+                          )}
+                        </div>
+
+                        {claims.culpabilities
+                          .length > 0 && (
+                          <div className="opportunity-list">
+                            {claims.culpabilities.map(
+                              (item) => (
+                                <div
+                                  className="opportunity-row"
+                                  key={item.name}
+                                >
+                                  <strong>
+                                    Culpabilidad IA:{" "}
+                                    {item.name}
+                                  </strong>
+
+                                  <div className="opportunity-value">
+                                    {number(item.count)}{" "}
+                                    casos
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+
+                        {claims.latest.length >
+                          0 && (
+                          <div className="opportunity-list">
+                            {claims.latest.map(
+                              (row) => (
+                                <div
+                                  className="opportunity-row"
+                                  key={row.id}
+                                >
+                                  <strong>
+                                    {row.client ||
+                                      "Sin cliente"}
+                                  </strong>
+
+                                  <div className="opportunity-value">
+                                    {row.type}
+                                  </div>
+
+                                  <span>
+                                    {[
+                                      row.status,
+                                      row.date
+                                        ? new Date(
+                                            row.date
+                                          ).toLocaleDateString(
+                                            "es-AR"
+                                          )
+                                        : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </span>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="empty-state">
+                        Todavía no hay denuncias cargadas.
+                        Cuando se carguen, cada una llega acá
+                        con su informe IA, la culpabilidad
+                        analizada y el estado del trámite.
+                      </div>
+                    )}
+                  </Section>
+                </>
+              );
+            })()}
+          </>
+        )}
+
+        {/*
+         * 045-B3 — Equipo: productividad por empleado y oficina con
+         * informes IA, gestiones y comisiones del sistema.
+         */}
+        {tab === "equipo" && (
+          <>
+            <HelpZone
+              help={MODULE_HELP.equipo}
+              id="equipo"
+              onAction={applyHelpAction}
+            />
+
+            {(() => {
+              const team = data.team;
+
+              const totals = team?.totals;
+
+              return (
+                <>
+                  <section className="kpi-grid">
+                    <Kpi
+                      title="Empleados con actividad"
+                      value={number(
+                        totals?.employees || 0
+                      )}
+                      subtitle="Activos con gestiones o comisiones"
+                      icon={<Users size={20} />}
+                    />
+
+                    <Kpi
+                      title="Gestiones del mes"
+                      value={number(
+                        totals?.gestionesMonth || 0
+                      )}
+                      subtitle="Gestiones cargadas este mes"
+                      icon={<ListTree size={20} />}
+                    />
+
+                    <Kpi
+                      title="Comisiones del mes"
+                      value={money(
+                        totals?.commissionMonth || 0
+                      )}
+                      subtitle={
+                        totals?.commissionMonth
+                          ? "Comisión final acumulada del mes"
+                          : "El sistema aún no registra comisiones cargadas"
+                      }
+                      tone="success"
+                      icon={<CircleDollarSign size={20} />}
+                    />
+
+                    <Kpi
+                      title="Informes IA"
+                      value={number(
+                        totals?.reports || 0
+                      )}
+                      subtitle="Empleados con informe de productividad IA"
+                      icon={<Sparkles size={20} />}
+                    />
+                  </section>
+
+                  <Section
+                    title="Rendimiento por empleado"
+                    subtitle="Comisiones y gestiones del sistema · informe de productividad IA"
+                  >
+                    {(team?.employees || []).length ? (
+                      <div className="action-grid">
+                        {(
+                          team?.employees || []
+                        )
+                          .slice(0, 12)
+                          .map((row) => (
+                            <article
+                              className="action-card"
+                              key={row.id}
+                            >
+                              <div>
+                                <strong>
+                                  {row.name}
+                                  {row.reportLevel
+                                    ? ` · ${row.reportLevel}`
+                                    : ""}
+                                </strong>
+
+                                {(row.commissionMonth > 0 ||
+                                  row.commissionYear > 0) && (
+                                  <span>
+                                    💰{" "}
+                                    {money(
+                                      row.commissionMonth
+                                    )}{" "}
+                                    este mes ·{" "}
+                                    {money(
+                                      row.commissionYear
+                                    )}{" "}
+                                    en el año
+                                  </span>
+                                )}
+
+                                <span>
+                                  {number(
+                                    row.gestionesMonth
+                                  )}{" "}
+                                  gestiones este mes ·{" "}
+                                  {number(
+                                    row.gestionesYear
+                                  )}{" "}
+                                  en el año
+                                </span>
+
+                                {row.report && (
+                                  <p
+                                    className="quality-quote"
+                                    title={row.report}
+                                  >
+                                    {row.report.slice(
+                                      0,
+                                      420
+                                    )}
+                                    {row.report.length >
+                                    420
+                                      ? " …"
+                                      : ""}
+                                  </p>
+                                )}
+                              </div>
+                            </article>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        Sin datos de empleados todavía.
+                      </div>
+                    )}
+                  </Section>
+
+                  <Section
+                    title="Productividad por oficina"
+                    subtitle="Gestiones anuales · informe IA por sucursal"
+                  >
+                    {(team?.offices || []).length ? (
+                      <div className="action-grid">
+                        {(team?.offices || []).map(
+                          (row) => (
+                            <article
+                              className="action-card"
+                              key={row.id}
+                            >
+                              <div>
+                                <strong>
+                                  {row.name}
+                                  {row.reportLevel
+                                    ? ` · ${row.reportLevel}`
+                                    : ""}
+                                </strong>
+
+                                <span>
+                                  {number(
+                                    row.gestionesMonth
+                                  )}{" "}
+                                  gestiones este mes ·{" "}
+                                  {number(
+                                    row.gestionesYear
+                                  )}{" "}
+                                  en el año
+                                </span>
+
+                                {row.report && (
+                                  <p
+                                    className="quality-quote"
+                                    title={row.report}
+                                  >
+                                    {row.report.slice(
+                                      0,
+                                      420
+                                    )}
+                                    {row.report.length >
+                                    420
+                                      ? " …"
+                                      : ""}
+                                  </p>
+                                )}
+                              </div>
+                            </article>
+                          )
+                        )}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        Sin datos de oficinas todavía.
+                      </div>
+                    )}
+                  </Section>
+                </>
+              );
+            })()}
           </>
         )}
 
