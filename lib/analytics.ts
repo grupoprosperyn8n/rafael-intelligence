@@ -7,6 +7,9 @@ import {
   CrmMatchRow,
   DashboardFilters,
   DashboardResponse,
+  CatalogBlock,
+  CatalogCoverageRow,
+  CatalogProductRow,
   DrillItem,
   DrillLink,
   DrillList,
@@ -626,6 +629,9 @@ function buildTeamBlock(args: {
           text(
             record.fields[employeeFields.name]
           ).trim() || "Empleado sin nombre",
+        office:
+          text(record.fields[employeeFields.locality]).trim() ||
+          undefined,
         gestionesMonth: numberValue(
           record.fields[employeeFields.countMonth]
         ),
@@ -718,6 +724,67 @@ function buildTeamBlock(args: {
   };
 }
 
+/* =====================================================================
+ * 045b — CATÁLOGO
+ * Análisis IA de productos y coberturas (los aiText que ya genera
+ * el sistema para cada ítem del catálogo).
+ * =================================================================== */
+
+function buildCatalogBlock(args: {
+  products: AirtableRecord[];
+  coverages: AirtableRecord[];
+  productFields: Record<string, string>;
+  coverageFields: Record<string, string>;
+}): CatalogBlock {
+  const { products, coverages, productFields, coverageFields } = args;
+
+  const productRows: CatalogProductRow[] = products
+    .map((record) => {
+      const analysis = aiText(
+        record.fields[productFields.analysis]
+      ).trim();
+      const recommendation = aiText(
+        record.fields[productFields.recommendation]
+      ).trim();
+
+      return {
+        id: record.id,
+        name:
+          text(record.fields[productFields.name]).trim() ||
+          "Producto sin nombre",
+        analysis: analysis || undefined,
+        analysisLevel: aiLevel(analysis) || undefined,
+        recommendation: recommendation || undefined,
+        recommendationLevel: aiLevel(recommendation) || undefined,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+  const coverageRows: CatalogCoverageRow[] = coverages
+    .map((record) => {
+      const analysis = aiText(
+        record.fields[coverageFields.analysis]
+      ).trim();
+      const categorization = aiText(
+        record.fields[coverageFields.category]
+      ).trim();
+
+      return {
+        id: record.id,
+        name:
+          text(record.fields[coverageFields.name]).trim() ||
+          "Cobertura sin nombre",
+        analysis: analysis || undefined,
+        analysisLevel: aiLevel(analysis) || undefined,
+        categorization: categorization || undefined,
+        categorizationLevel: aiLevel(categorization) || undefined,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+  return { products: productRows, coverages: coverageRows };
+}
+
 export async function buildDashboard(
   filters: DashboardFilters = {}
 ): Promise<DashboardResponse> {
@@ -749,6 +816,7 @@ export async function buildDashboard(
     rawClaimsAccident,
     rawClaimsTheft,
     rawClaimsFire,
+    rawCoverages,
   ] = await Promise.all([
     airtableTable(
       agenticConfig.baseId,
@@ -838,6 +906,14 @@ export async function buildDashboard(
       agenticConfig.baseId,
       agenticConfig.tables.claimsFire,
       Object.values(agenticConfig.fireClaimFields),
+      { force }
+    ),
+
+    // 045b — TIPO DE COBERTURA (análisis IA del catálogo).
+    airtableTable(
+      agenticConfig.baseId,
+      agenticConfig.tables.coverage,
+      Object.values(agenticConfig.coverageFields),
       { force }
     ),
   ]);
@@ -3767,6 +3843,14 @@ export async function buildDashboard(
     officeFields: agenticConfig.officeTeamFields,
   });
 
+  // 045b — Catálogo: análisis IA de productos y coberturas.
+  const catalog = buildCatalogBlock({
+    products: rawProducts,
+    coverages: rawCoverages,
+    productFields: agenticConfig.productFields,
+    coverageFields: agenticConfig.coverageFields,
+  });
+
   return {
     generatedAt:
       new Date().toISOString(),
@@ -3977,6 +4061,8 @@ export async function buildDashboard(
     quality,
 
     team,
+
+    catalog,
 
     lists,
 

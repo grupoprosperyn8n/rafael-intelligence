@@ -51,6 +51,9 @@ export const CONFIG = {
       claimsAccident: "DENUNCIA DE ACCIDENTE",
       claimsTheft: "DENUNCIA ROBO OC",
       claimsFire: "DENUNCIA ROBO / INCENDIO",
+
+      // 045b — catálogo: coberturas con análisis IA.
+      coverage: "TIPO DE COBERTURA",
     },
 
     clientFields: {
@@ -88,6 +91,16 @@ export const CONFIG = {
 
     productFields: {
       name: "NOMBRE PRODUCTO",
+      // 045b — análisis IA del producto (aiText).
+      analysis: "ANÁLISIS IA GENERAL",
+      recommendation: "RECOMENDACIÓN IA DE MEJORAS",
+    },
+
+    /* 045b — campos de TIPO DE COBERTURA (análisis y categorización IA). */
+    coverageFields: {
+      name: "NOMBRE DE COBERTURA",
+      analysis: "ANALISIS IA COBERTURA",
+      category: "CATEGORIZACION IA DE TIPO",
     },
 
     companyFields: {
@@ -98,6 +111,8 @@ export const CONFIG = {
      * (informe IA + comisiones + gestiones del sistema). */
     employeeFields: {
       name: "NOMBRE Y APELLIDO",
+      // 045b — sucursal del empleado (para el filtro por sucursal).
+      locality: "LOCALIDAD",
       report: "INFORME_PRODUCTIVIDAD",
       commissionYear:
         "💰✅ TOTAL COMISIÓN FINAL (de GESTION GENERAL) DEL AÑO",

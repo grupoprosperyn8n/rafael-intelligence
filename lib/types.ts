@@ -218,6 +218,9 @@ export type DashboardResponse = {
   /* 045-B3 — Equipo: productividad por empleado/oficina (info IA). */
   team?: TeamBlock;
 
+  /* 045b — Catálogo: análisis IA de productos y coberturas. */
+  catalog?: CatalogBlock;
+
   /*
    * Cola de hoy: jugadas accionables calculadas por el motor de datos
    * (renovaciones, reactivación, venta cruzada, retención). Cada item
@@ -609,6 +612,8 @@ export type QualityBlock = {
 export type TeamEmployeeRow = {
   id: string;
   name: string;
+  // 045b — sucursal del empleado (para el filtro por sucursal).
+  office?: string;
   gestionesMonth: number;
   gestionesYear: number;
   commissionMonth: number;
@@ -638,3 +643,32 @@ export type TeamBlock = {
     reports: number;
   };
 };
+
+/*
+ * 045b — CATÁLOGO: análisis IA de PRODUCTOS y TIPO DE COBERTURA
+ * (los aiText que ya genera el sistema para cada ítem del catálogo).
+ */
+
+export type CatalogProductRow = {
+  id: string;
+  name: string;
+  analysis?: string;
+  analysisLevel?: string;
+  recommendation?: string;
+  recommendationLevel?: string;
+};
+
+export type CatalogCoverageRow = {
+  id: string;
+  name: string;
+  analysis?: string;
+  analysisLevel?: string;
+  categorization?: string;
+  categorizationLevel?: string;
+};
+
+export type CatalogBlock = {
+  products: CatalogProductRow[];
+  coverages: CatalogCoverageRow[];
+};
+
