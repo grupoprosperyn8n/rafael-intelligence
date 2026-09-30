@@ -91,9 +91,10 @@ export const CONFIG = {
 
     productFields: {
       name: "NOMBRE PRODUCTO",
-      // 045b — análisis IA del producto (aiText).
+      // 045b — análisis IA del producto (aiText) + compañía (link).
       analysis: "ANÁLISIS IA GENERAL",
       recommendation: "RECOMENDACIÓN IA DE MEJORAS",
+      company: "COMPANIA",
     },
 
     /* 045b — campos de TIPO DE COBERTURA (análisis y categorización IA). */

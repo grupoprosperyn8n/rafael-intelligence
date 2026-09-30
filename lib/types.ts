@@ -652,6 +652,8 @@ export type TeamBlock = {
 export type CatalogProductRow = {
   id: string;
   name: string;
+  // 045b — compañía del producto (link COMPANIA resuelto).
+  company?: string;
   analysis?: string;
   analysisLevel?: string;
   recommendation?: string;

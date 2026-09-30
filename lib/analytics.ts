@@ -735,8 +735,15 @@ function buildCatalogBlock(args: {
   coverages: AirtableRecord[];
   productFields: Record<string, string>;
   coverageFields: Record<string, string>;
+  companyNames: Map<string, string>;
 }): CatalogBlock {
-  const { products, coverages, productFields, coverageFields } = args;
+  const {
+    products,
+    coverages,
+    productFields,
+    coverageFields,
+    companyNames,
+  } = args;
 
   const productRows: CatalogProductRow[] = products
     .map((record) => {
@@ -746,12 +753,20 @@ function buildCatalogBlock(args: {
       const recommendation = aiText(
         record.fields[productFields.recommendation]
       ).trim();
+      const companyIds = record.fields[productFields.company];
+      const companyId = Array.isArray(companyIds)
+        ? text(companyIds[0]).trim()
+        : "";
+      const company = companyId
+        ? companyNames.get(companyId)
+        : undefined;
 
       return {
         id: record.id,
         name:
           text(record.fields[productFields.name]).trim() ||
           "Producto sin nombre",
+        company: company || undefined,
         analysis: analysis || undefined,
         analysisLevel: aiLevel(analysis) || undefined,
         recommendation: recommendation || undefined,
@@ -3849,6 +3864,7 @@ export async function buildDashboard(
     coverages: rawCoverages,
     productFields: agenticConfig.productFields,
     coverageFields: agenticConfig.coverageFields,
+    companyNames,
   });
 
   return {
